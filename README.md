@@ -109,3 +109,7 @@ POST /api/v1/deobfuscate
 ```
 
 详见 `AGENTS.md`（维护约定）与 `Plan.md`（设计决策）。
+
+## 许可
+
+本项目使用 **MIT NoFree License**：基于 MIT，但**禁止商用**（非商业、个人、教育、研究用途免费）。详见 [LICENSE](LICENSE)。
