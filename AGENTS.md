@@ -79,7 +79,6 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务，利用 Fabric Yarn 映
 - 集成测试：`bash test.sh`（7 个场景：health、v1/v2 真实映射反混淆、描述符、多行日志、透传、错误码）
 
 ## 注意事项
-- Termux 环境 `/tmp` 只读，测试临时文件用项目目录
 - 集成测试若 8080 被占用，先 `pkill -f target/release/spinyarn`
 - Axum 默认请求体 2MB，5MB 日志需 64MB limit（已配置，勿删）
 - regex crate 不支持 look-around，边界处理用 `\b` + 前缀边界捕获组实现
