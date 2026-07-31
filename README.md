@@ -77,7 +77,7 @@ cargo build --release
 
 内置 43 个版本：1.14 ~ 1.21.11（完整列表见 `src/config.rs::SUPPORTED_VERSIONS`）。其余版本透传。
 
-## 性能（Termux aarch64，release）
+## 性能（linux x86_64，release）
 
 | 场景 | 耗时 |
 |------|------|
