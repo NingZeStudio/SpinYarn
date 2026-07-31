@@ -1,0 +1,134 @@
+name: Release Build
+
+# 当提交信息以 [Build] 开头时（或手动触发），构建多平台二进制并发布 GitHub Release，
+# Release notes 取自 CHANGELOG.md 最新版本条目。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event.head_commit.message }}" == "[Build]"* ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check-commit
+    if: needs.check-commit.outputs.should_build == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: linux-aarch64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macos-x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache bundled mappings
+        id: mappings-cache
+        uses: actions/cache@v4
+        with:
+          path: mappings
+          key: yarn-mappings-v1
+
+      - name: Download bundled mappings
+        if: steps.mappings-cache.outputs.cache-hit != 'true'
+        run: bash scripts/download_mappings.sh
+
+      - name: Install zig (aarch64 cross-compile)
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        uses: mlugg/setup-zig@v1
+
+      - name: Install cargo-zigbuild
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build (zigbuild cross-compile)
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: cargo zigbuild --release --target ${{ matrix.target }}
+
+      - name: Build
+        if: matrix.target != 'aarch64-unknown-linux-musl'
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "target/${{ matrix.target }}/release/spinyarn.exe" "dist/spinyarn-${{ matrix.name }}.exe"
+          else
+            cp "target/${{ matrix.target }}/release/spinyarn" "dist/spinyarn-${{ matrix.name }}"
+          fi
+          chmod +x "dist/spinyarn-${{ matrix.name }}"* 2>/dev/null || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spinyarn-${{ matrix.name }}
+          path: dist/*
+
+  release:
+    needs: build
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate release metadata
+        id: meta
+        shell: bash
+        run: |
+          VER=$(grep -m1 '^version' Cargo.toml | sed 's/.*= *"\(.*\)".*/\1/')
+          echo "tag=v${VER}" >> "$GITHUB_OUTPUT"
+          awk 'BEGIN{s=0} /^## /{if(s) exit; s=1; next} s{print}' CHANGELOG.md > RELEASE_NOTES.md
+          echo "files:" && ls -lh dist/
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: SpinYarn ${{ steps.meta.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*

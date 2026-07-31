@@ -30,7 +30,8 @@ find_latest_build() {
     local encoded="$1"
     local listing
     listing=$(curl -sf "https://maven.fabricmc.net/net/fabricmc/yarn/" 2>/dev/null) || { echo ""; return 1; }
-    echo "$listing" | grep -o "${encoded}%2Bbuild\.[0-9]*" | sed 's/%2B/+/g' | sort -V | tail -1
+    echo "$listing" | grep -o "${encoded}%2Bbuild\.[0-9]*" | sed 's/%2B/+/g' \
+        | awk -F'build.' 'NR==1{m=$2;l=$0} {if($2>m){m=$2;l=$0}} END{print l}'
 }
 
 # Extract .tiny from a JAR, write gzipped output
