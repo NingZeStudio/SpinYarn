@@ -1,0 +1,19 @@
+# Rust build artifacts
+/target
+
+# Bundled mappings (download via scripts/download_mappings.sh before building)
+/mappings
+
+# Logs & temp
+*.log
+*.log.txt
+*.tmp
+
+# Keep real-log test samples
+!tests/fixtures/*.log
+!tests/fixtures/*.log.txt
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store

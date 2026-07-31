@@ -1,0 +1,718 @@
+==================== Before Start ====================
+invoke redirectStdio
+invoke setLogPipeReady
+invoke setFCLNativeWindow
+invoke setEventPipe
+==================== Start Minecraft ====================
+Renderer: MobileGlues
+Device: Huawei ELE-AL00 ELE-AL00
+Log pipe ready.
+Architecture: arm64
+CPU: kirin980
+Android SDK: 29
+Language: zh_CN_#Hans
+FCL Version Code: 1320
+==================== Mods ====================
+BiomesOPlenty-fabric-1.21.9-21.8.0.20 | biomesoplenty | **.**.**.** | FABRIC
+fabric-api-0.134.1+1.21.9 | fabric-api | 0.134.1+1.21.9 | FABRIC
+GlitchCore-fabric-1.21.9-21.9.0.2 | glitchcore | **.**.**.** | FABRIC
+iris-fabric-1.9.3+mc1.21.9 | iris | 1.9.3+mc1.21.9 | FABRIC
+sodium-fabric-0.7.3+mc1.21.10 | sodium | 0.7.3+mc1.21.10 | FABRIC
+TerraBlender-fabric-1.21.9-21.9.0.1 | terrablender | **.**.**.** | FABRIC
+
+==================== Env Map ====================
+Env: PATH=/data/user/0/com.tungsten.fcl/app_runtime/java/jre21/bin:/sbin:/system/sbin:/product/bin:/apex/com.android.runtime/bin:/system/bin:/system/xbin:/odm/bin:/vendor/bin:/vendor/xbin
+Env: FCL_VERSION_CODE=1320
+Env: POJAV_RENDERER=opengles3
+Env: POJAV_NATIVEDIR=/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64
+Env: FORCE_VSYNC=false
+Env: JAVA_HOME=/data/user/0/com.tungsten.fcl/app_runtime/java/jre21
+Env: MOD_ANDROID_RUNTIME=/data/user/0/com.tungsten.fcl/app_runtime_mod
+Env: POJAVEXEC_EGL=libEGL.so
+Env: TMPDIR=/data/user/0/com.tungsten.fcl/cache
+Env: LIBGL_ES=3
+Env: FCL_NATIVEDIR=/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64
+Env: DRIVER_PATH=/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64
+Env: LD_LIBRARY_PATH=/data/user/0/com.tungsten.fcl/app_runtime/jna:/data/app/com.fcl.plugin.mobileglues-gNvz6w2alronSrD4ySAI7w==/lib/arm64:/data/user/0/com.tungsten.fcl/app_runtime_mod:/system/lib64:/vendor/lib64:/vendor/lib64/hw:/system_ext/lib64:/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64
+Env: HOME=/storage/emulated/0/FCL/log
+Env: INST_FABRIC=1
+==================== DLOPEN ====================
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjli.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/server/libjvm.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libfreetype.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libverify.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjava.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libnet.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libnio.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libawt.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libawt_headless.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libfontmanager.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libsctp.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libnet.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libextnet.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libfreetype.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libverify.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libsyslookup.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjli.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjdwp.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libzip.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libawt.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjaas.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libmanagement_agent.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjimage.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/liblcms.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libnio.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libawt_headless.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libmanagement_ext.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/librmi.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjawt.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libmlib_image.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libmanagement.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjavajpeg.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libj2pkcs11.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libfontmanager.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libprefs.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libdt_socket.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libinstrument.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libj2gss.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjsig.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libjava.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/server/libjvm.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/server/libjsig.so
+DLOPEN: loading /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/libawt_xawt.so
+DLOPEN: loading /data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64/libopenal.so
+DLOPEN: loading /data/app/com.fcl.plugin.mobileglues-gNvz6w2alronSrD4ySAI7w==/lib/arm64/libspirv-cross-c-shared.so
+WARNING: linker: Warning: "/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64/libc++_shared.so" unused DT entry: unknown processor-specific (type 0x70000001 arg 0x0) (ignoring)
+DLOPEN: loading /data/app/com.fcl.plugin.mobileglues-gNvz6w2alronSrD4ySAI7w==/lib/arm64/libshaderconv.so
+Initializing MobileGlues ...
+The Open Source License of MobileGlues: 
+  GNU LGPL-2.1 License
+Failed to load config. Use default config.
+MG_DIR_PATH = (null)
+[MobileGlues] Setting: enableAngle            = false
+[MobileGlues] Setting: ignoreError            = 0
+[MobileGlues] Setting: enableExtComputeShader = false
+[MobileGlues] Setting: enableExtGL43          = false
+[MobileGlues] Setting: enableExtTimerQuery          = false
+[MobileGlues] Setting: maxGlslCacheSize       = 0
+[MobileGlues] Setting: multidrawMode          = Auto
+[MobileGlues] Setting: angleDepthClearFixMode = 0
+[MobileGlues] Setting: bufferCoherentAsFlush = 1
+EGL initialized successfully
+OpenGL ES Version: OpenGL ES 3.2 (320)
+Not Detected GL_EXT_multi_draw_indirect!
+multidrawMode = Auto
+    -> Indirect (Auto detected)
+DLOPEN: loading /data/app/com.fcl.plugin.mobileglues-gNvz6w2alronSrD4ySAI7w==/lib/arm64/libmobileglues.so
+Working directory: /storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft
+==================== Minecraft Arguments ====================
+Java argument: /data/user/0/com.tungsten.fcl/app_runtime/java/jre21/bin/java
+Java argument: -Djava.awt.headless=false
+Java argument: -Dcacio.managed.screensize=2340x1080
+Java argument: -Dcacio.font.fontmanager=sun.awt.X11FontManager
+Java argument: -Dcacio.font.fontscaler=sun.font.FreetypeFontScaler
+Java argument: -Dswing.defaultlaf=javax.swing.plaf.nimbus.NimbusLookAndFeel
+Java argument: -Dawt.toolkit=com.github.caciocavallosilano.cacio.ctc.CTCToolkit
+Java argument: -Djava.awt.graphicsenv=com.github.caciocavallosilano.cacio.ctc.CTCGraphicsEnvironment
+Java argument: -javaagent:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-agent.jar
+Java argument: --add-exports=java.desktop/java.awt=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/java.awt.peer=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/sun.awt.image=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/sun.java2d=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/java.awt.dnd.peer=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/sun.awt=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/sun.awt.event=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/sun.awt.datatransfer=ALL-UNNAMED
+Java argument: --add-exports=java.desktop/sun.font=ALL-UNNAMED
+Java argument: --add-exports=java.base/sun.security.action=ALL-UNNAMED
+Java argument: --add-opens=java.base/java.util=ALL-UNNAMED
+Java argument: --add-opens=java.desktop/java.awt=ALL-UNNAMED
+Java argument: --add-opens=java.desktop/sun.font=ALL-UNNAMED
+Java argument: --add-opens=java.desktop/sun.java2d=ALL-UNNAMED
+Java argument: --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+Java argument: --add-opens=java.base/java.net=ALL-UNNAMED
+Java argument: -Xbootclasspath/a:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-agent.jar:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-shared-1.19.1-SNAPSHOT.jar:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-tta-1.19.1-SNAPSHOT.jar
+Java argument: -Xmx2277m
+Java argument: -Xms2048m
+Java argument: -Dfile.encoding=UTF-8
+Java argument: -Dstdout.encoding=UTF-8
+Java argument: -Dstderr.encoding=UTF-8
+Java argument: -Djava.rmi.server.useCodebaseOnly=true
+Java argument: -Dcom.sun.jndi.rmi.object.trustURLCodebase=false
+Java argument: -Dcom.sun.jndi.cosnaming.object.trustURLCodebase=false
+Java argument: -Dlog4j2.formatMsgNoLookups=true
+Java argument: -Dlog4j.configurationFile=/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/versions/1.21.9-Fabric/log4j2.xml
+Java argument: -Dminecraft.client.jar=/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/versions/1.21.9-Fabric/1.21.9-Fabric.jar
+Java argument: -XX:ActiveProcessorCount=8
+Java argument: -Dfml.ignoreInvalidMinecraftCertificates=true
+Java argument: -Dfml.ignorePatchDiscrepancies=true
+Java argument: -Dext.net.resolvPath=/data/user/0/com.tungsten.fcl/app_runtime/java/resolv.conf
+Java argument: -Djava.io.tmpdir=/data/user/0/com.tungsten.fcl/cache/fclauncher
+Java argument: -Dos.name=Linux
+Java argument: -Dos.version=Android-10
+Java argument: -Dorg.lwjgl.opengl.libname=/data/app/com.fcl.plugin.mobileglues-gNvz6w2alronSrD4ySAI7w==/lib/arm64/libmobileglues.so
+Java argument: -Dorg.lwjgl.openal.libname=/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64/libopenal.so
+Java argument: -Dorg.lwjgl.freetype.libname=/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64/libfreetype.so
+Java argument: -Dfml.earlyprogresswindow=false
+Java argument: -Dglfwstub.windowWidth=2340
+Java argument: -Dglfwstub.windowHeight=1080
+Java argument: -Dglfwstub.initEgl=false
+Java argument: -Dloader.disable_forked_guis=true
+Java argument: -Duser.home=/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft
+Java argument: -Duser.language=zh
+Java argument: -Duser.country=CN
+Java argument: -Duser.timezone=Asia/Shanghai
+Java argument: -Dorg.lwjgl.vulkan.libname=libvulkan.so
+Java argument: -Dorg.lwjgl.spvc.libname=spirv-cross-c-shared
+Java argument: -Dsodium.checks.issue2561=false
+Java argument: -Djdk.lang.Process.launchMechanism=FORK
+Java argument: -Dcpu.name=kirin980
+Java argument: -Djna.boot.library.path=/data/user/0/com.tungsten.fcl/app_runtime/jna/5.15.0
+Java argument: -javaagent:/data/user/0/com.tungsten.fcl/files/plugins/MioLibPatcher.jar
+Java argument: -Djava.library.path=/data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib:/data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/jli:/data/user/0/com.tungsten.fcl/app_runtime/java/jre21/lib/server:/data/user/0/com.tungsten.fcl/app_runtime/jna:/data/app/com.fcl.plugin.mobileglues-gNvz6w2alronSrD4ySAI7w==/lib/arm64:/data/user/0/com.tungsten.fcl/app_runtime_mod:/system/lib64:/vendor/lib64:/vendor/lib64/hw:/system_ext/lib64:/data/app/com.tungsten.fcl-ZrAfSoUCwH-o9lxBdNUyeg==/lib/arm64
+Java argument: -Djna.tmpdir=/data/user/0/com.tungsten.fcl/cache/fclauncher
+Java argument: -Dorg.lwjgl.system.SharedLibraryExtractPath=/data/user/0/com.tungsten.fcl/cache/fclauncher
+Java argument: -Dio.netty.native.workdir=/data/user/0/com.tungsten.fcl/cache/fclauncher
+Java argument: -Dminecraft.launcher.brand=Fold Craft Launcher
+Java argument: -Dminecraft.launcher.version=**.**.**.**
+Java argument: -cp
+Java argument: /data/user/0/com.tungsten.fcl/app_runtime/lwjgl/lwjgl.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/fabricmc/intermediary/1.21.9/intermediary-1.21.9.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/fabricmc/fabric-loader/0.19.3/fabric-loader-0.19.3.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/fasterxml/jackson/core/jackson-annotations/2.13.4/jackson-annotations-2.13.4.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/fasterxml/jackson/core/jackson-core/2.13.4/jackson-core-2.13.4.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/fasterxml/jackson/core/jackson-databind/**.**.**.**/jackson-databind-2.13.4.2.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/github/oshi/oshi-core/6.6.5/oshi-core-6.6.5.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/github/stephenc/jcip/jcip-annotations/1.0-1/jcip-annotations-1.0-1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/google/guava/guava/33.3.1-jre/guava-33.3.1-jre.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/ibm/icu/icu4j/76.1/icu4j-76.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/microsoft/azure/msal4j/1.17.2/msal4j-1.17.2.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/authlib/7.0.61/authlib-7.0.61.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/blocklist/1.0.10/blocklist-1.0.10.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/jtracy/1.0.36/jtracy-1.0.36.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/logging/1.5.10/logging-1.5.10.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/patchy/2.2.10/patchy-2.2.10.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/mojang/text2speech/1.18.11/text2speech-1.18.11.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/nimbusds/content-type/2.3/content-type-2.3.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/nimbusds/lang-tag/1.7/lang-tag-1.7.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/nimbusds/nimbus-jose-jwt/9.40/nimbus-jose-jwt-9.40.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/com/nimbusds/oauth2-oidc-sdk/11.18/oauth2-oidc-sdk-11.18.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/commons-codec/commons-codec/1.17.1/commons-codec-1.17.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/commons-io/commons-io/2.17.0/commons-io-2.17.0.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/commons-logging/commons-logging/1.3.4/commons-logging-1.3.4.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-buffer/4.1.118.Final/netty-buffer-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-codec-http/4.1.118.Final/netty-codec-http-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-codec/4.1.118.Final/netty-codec-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-common/4.1.118.Final/netty-common-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-handler/4.1.118.Final/netty-handler-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-resolver/4.1.118.Final/netty-resolver-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-transport-classes-epoll/4.1.118.Final/netty-transport-classes-epoll-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-transport-native-unix-common/4.1.118.Final/netty-transport-native-unix-common-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/io/netty/netty-transport/4.1.118.Final/netty-transport-4.1.118.Final.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/it/unimi/dsi/fastutil/8.5.15/fastutil-8.5.15.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/java/dev/jna/jna-platform/5.15.0/jna-platform-5.15.0.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/java/dev/jna/jna/5.15.0/jna-5.15.0.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/minidev/accessors-smart/2.5.1/accessors-smart-2.5.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/minidev/json-smart/2.5.1/json-smart-2.5.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/commons/commons-compress/1.27.1/commons-compress-1.27.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/commons/commons-lang3/3.17.0/commons-lang3-3.17.0.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/httpcomponents/httpclient/4.5.14/httpclient-4.5.14.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/httpcomponents/httpcore/4.4.16/httpcore-4.4.16.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/logging/log4j/log4j-api/2.24.1/log4j-api-2.24.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/logging/log4j/log4j-core/2.24.1/log4j-core-2.24.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/apache/logging/log4j/log4j-slf4j2-impl/2.24.1/log4j-slf4j2-impl-2.24.1.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/jcraft/jorbis/0.0.17/jorbis-0.0.17.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/joml/joml/1.10.8/joml-1.10.8.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/lz4/lz4-java/1.8.0/lz4-java-1.8.0.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/org/slf4j/slf4j-api/2.0.16/slf4j-api-2.0.16.jar:/data/user/0/com.tungsten.fcl/files/plugins/MioLaunchWrapper.jar:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/versions/1.21.9-Fabric/1.21.9-Fabric.jar
+Java argument: --add-exports
+Java argument: net.fabricmc.loader.impl.launch.knot/net.fabricmc.loader.impl.launch.knot=ALL-UNNAMED
+MainClass: mio.Wrapper
+MainClass: net.fabricmc.loader.impl.launch.knot.KnotClient
+Minecraft argument: --username
+Minecraft argument: sjjabiw
+Minecraft argument: --version
+Minecraft argument: 1.21.9-Fabric
+Minecraft argument: --gameDir
+Minecraft argument: /storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft
+Minecraft argument: --assetsDir
+Minecraft argument: /storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/assets
+Minecraft argument: --assetIndex
+Minecraft argument: 27
+Minecraft argument: --uuid
+Minecraft argument: ec3bbb217d693594b1ac576750a77ca8
+Minecraft argument: --accessToken
+Minecraft argument: ***
+Minecraft argument: --clientId
+Minecraft argument: ${clientid}
+Minecraft argument: --xuid
+Minecraft argument: ${auth_xuid}
+Minecraft argument: --versionType
+Minecraft argument: Fold Craft Launcher
+Minecraft argument: --width
+Minecraft argument: 2340
+Minecraft argument: --height
+Minecraft argument: 1080
+Hook success
+Done processing args
+[FCL Internal] /home/********/work/FoldCraftLauncher/FoldCraftLauncher/FCLauncher/src/main/jni/jre_launcher.c:146
+Found JLI lib
+[FCL Internal] /home/********/work/FoldCraftLauncher/FoldCraftLauncher/FCLauncher/src/main/jni/jre_launcher.c:158
+Calling JLI_Launch
+WARNING: Unknown module: net.fabricmc.loader.impl.launch.knot specified to --add-exports
+[MioLibPatcher/INFO]: MioPatcher is running!
+[11:18:55] [main/INFO]: Loading Minecraft 1.21.9 with Fabric Loader 0.19.3
+[11:18:55] [main/INFO]: Loading 59 mods:
+	- biomesoplenty **.**.**.**
+	   |-- com_electronwill_night-config_core 3.6.7
+	   |-- com_electronwill_night-config_toml 3.6.7
+	   \-- net_jodah_typetools 0.6.3
+	- fabric-api 0.134.1+1.21.9
+	   |-- fabric-api-base 1.0.0+14b92d897d
+	   |-- fabric-api-lookup-api-v1 1.6.106+d17682157d
+	   |-- fabric-biome-api-v1 16.1.0+c2417d4f7d
+	   |-- fabric-block-api-v1 1.1.5+d17682157d
+	   |-- fabric-block-view-api-v2 1.0.34+e4fd1b927d
+	   |-- fabric-command-api-v2 2.3.7+328a75ba7d
+	   |-- fabric-content-registries-v0 10.2.3+b6a242647d
+	   |-- fabric-convention-tags-v1 2.1.47+7f945d5b7d
+	   |-- fabric-convention-tags-v2 2.15.12+3154c1c87d
+	   |-- fabric-crash-report-info-v1 0.3.18+33df5e6e7d
+	   |-- fabric-data-attachment-api-v1 1.8.28+9bce411b7d
+	   |-- fabric-data-generation-api-v1 23.2.22+d8b85ef17d
+	   |-- fabric-dimensions-v1 4.0.22+38b9cc197d
+	   |-- fabric-entity-events-v1 2.1.12+14b92d897d
+	   |-- fabric-events-interaction-v0 4.0.35+5ba217127d
+	   |-- fabric-game-rule-api-v1 1.1.1+e47eaae57d
+	   |-- fabric-item-api-v1 11.5.8+9bce411b7d
+	   |-- fabric-item-group-api-v1 4.2.24+86b3ae577d
+	   |-- fabric-key-binding-api-v1 1.1.1+b3ba9c487d
+	   |-- fabric-lifecycle-events-v1 2.6.9+33df5e6e7d
+	   |-- fabric-loot-api-v2 3.0.64+3f89f5a57d
+	   |-- fabric-loot-api-v3 2.0.11+d17682157d
+	   |-- fabric-message-api-v1 6.1.7+3154c1c87d
+	   |-- fabric-model-loading-api-v1 6.0.1+3ffd6ef07d
+	   |-- fabric-networking-api-v1 5.0.13+d269470c7d
+	   |-- fabric-object-builder-api-v1 21.1.24+9bce411b7d
+	   |-- fabric-particles-v1 4.2.2+a0ee59a47d
+	   |-- fabric-recipe-api-v1 8.1.26+d17682157d
+	   |-- fabric-registry-sync-v0 6.1.41+679c8c5c7d
+	   |-- fabric-renderer-api-v1 7.1.2+c523dc837d
+	   |-- fabric-renderer-indigo 4.0.20+c523dc837d
+	   |-- fabric-rendering-fluids-v1 3.1.38+86b3ae577d
+	   |-- fabric-resource-conditions-api-v1 5.0.28+33df5e6e7d
+	   |-- fabric-screen-api-v1 3.1.0+9c82a7987d
+	   |-- fabric-screen-handler-api-v1 1.3.150+d17682157d
+	   |-- fabric-serialization-api-v1 1.0.0+d857c9767d
+	   |-- fabric-sound-api-v1 1.0.45+328a75ba7d
+	   |-- fabric-tag-api-v1 1.2.10+2fa446b27d
+	   |-- fabric-transfer-api-v1 6.0.15+79ec2c127d
+	   \-- fabric-transitive-access-wideners-v1 6.5.3+41eb43437d
+	- fabricloader 0.19.3
+	   \-- mixinextras 0.5.4
+	- glitchcore **.**.**.**
+	   |-- com_electronwill_night-config_core 3.6.7
+	   |-- com_electronwill_night-config_toml 3.6.7
+	   \-- net_jodah_typetools 0.6.3
+	- iris 1.9.3+mc1.21.9
+	   |-- io_github_douira_glsl-transformer 3.0.0-pre3
+	   |-- org_anarres_jcpp 1.4.14
+	   \-- org_antlr_antlr4-runtime 4.13.1
+	- java 21
+	- minecraft 1.21.9
+	- sodium 0.7.3+mc1.21.10
+	   |-- fabric-rendering-v1 16.0.2+91152d886f
+	   |-- fabric-resource-loader-v0 3.2.3+3388a3b26f
+	   \-- fabric-resource-loader-v1 1.0.3+8cc86c156f
+	- terrablender **.**.**.**
+	   |-- com_electronwill_night-config_core 3.6.7
+	   \-- com_electronwill_night-config_toml 3.6.7
+[11:18:55] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/libraries/net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[11:18:55] [main/INFO]: Compatibility level set to JAVA_17
+[11:18:55] [main/INFO]: Compatibility level set to JAVA_21
+[11:18:56] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[11:18:56] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[11:18:57] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[11:18:57] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[11:18:57] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[11:18:57] [main/INFO]: Searching for graphics cards...
+[11:18:57] [main/WARN]: Could not find any graphics adapters! Probably the device is not on a bus we can probe, or there are no devices supporting 3D acceleration.
+[11:18:57] [main/WARN]: Unable to determine desktop session type because the environment variable XDG_SESSION_TYPE is not set! Your user session may not be configured correctly.
+[11:18:59] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.4).
+[MioLibPatcher/INFO]: Patch target class: oshi/hardware/CentralProcessor$ProcessorIdentifier
+[11:19:01] [main/WARN]: Did not find udev library in operating system. Some features may not work.
+[11:19:01] [main/WARN]: File not found or not readable: /proc/stat
+[11:19:03] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 2147 milliseconds
+[11:19:17] [Render thread/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[11:19:17] [Render thread/INFO]: Setting user: sjjabiw
+[11:19:19] [Download-2/ERROR]: Failed to fetch user properties
+com.mojang.authlib.exceptions.InvalidCredentialsException: Status: 401
+	at knot/com.mojang.authlib.exceptions.MinecraftClientHttpException.toAuthenticationException(MinecraftClientHttpException.java:59) ~[authlib-7.0.61.jar:?]
+	at knot/com.mojang.authlib.yggdrasil.YggdrasilUserApiService.fetchProperties(YggdrasilUserApiService.java:150) ~[authlib-7.0.61.jar:?]
+	at knot/net.minecraft.class_310.method_55608(class_310.java:465) ~[client-intermediary.jar:?]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source) ~[?:?]
+	at java.base/java.lang.Thread.run(Unknown Source) [?:?]
+Caused by: com.mojang.authlib.exceptions.MinecraftClientHttpException: Status: 401
+	at knot/com.mojang.authlib.minecraft.client.MinecraftClient.readInputStream(MinecraftClient.java:103) ~[authlib-7.0.61.jar:?]
+	at knot/com.mojang.authlib.minecraft.client.MinecraftClient.get(MinecraftClient.java:56) ~[authlib-7.0.61.jar:?]
+	at knot/com.mojang.authlib.yggdrasil.YggdrasilUserApiService.fetchProperties(YggdrasilUserApiService.java:121) ~[authlib-7.0.61.jar:?]
+	... 5 more
+[11:19:20] [Render thread/INFO]: Registered region minecraft:overworld to index 0 for type OVERWORLD
+[11:19:20] [Render thread/INFO]: Registered region minecraft:nether to index 0 for type NETHER
+[11:19:20] [Render thread/INFO]: Registered region biomesoplenty:overworld_primary to index 1 for type OVERWORLD
+[11:19:20] [Render thread/INFO]: Registered region biomesoplenty:overworld_secondary to index 2 for type OVERWORLD
+[11:19:20] [Render thread/INFO]: Registered region biomesoplenty:overworld_rare to index 3 for type OVERWORLD
+[11:19:20] [Render thread/INFO]: Registered region biomesoplenty:nether_common to index 1 for type NETHER
+[11:19:20] [Render thread/INFO]: Registered region biomesoplenty:nether_rare to index 2 for type NETHER
+[11:19:20] [Render thread/INFO]: [Indigo] Different rendering plugin detected; not applying Indigo.
+Registered forkAndExec
+LwjglLinkerHook:Installing LWJGL dlopen() hook
+[11:19:20] [Render thread/INFO]: [STDOUT]: [MioLibPatcher/INFO]: Patch target class: org/lwjgl/system/Library
+[LWJGL] Failed to load a library. Possible solutions:
+	a) Add the directory that contains the shared library to -Djava.library.path or -Dorg.lwjgl.librarypath.
+	b) Add the JAR that contains the shared library to the classpath.
+[LWJGL] Enable debug mode with -Dorg.lwjgl.util.Debug=true for better diagnostics.
+[LWJGL] Enable the SharedLibraryLoader debug mode with -Dorg.lwjgl.util.DebugLoader=true for better diagnostics.
+[11:19:21] [Render thread/INFO]: Backend library: LWJGL version 3.3.6-snapshot
+EGLBridge: Binding to OpenGL ES
+[11:19:22] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[11:19:23] [Render thread/INFO]: Debug functionality is disabled.
+[11:19:23] [Render thread/INFO]: DSA support not detected.
+[11:19:23] [Render thread/INFO]: Shaders are disabled because no valid shaderpack is selected
+[11:19:23] [Render thread/INFO]: OpenGL Vendor: Swung0x48, BZLZHH, Tungsten
+[11:19:23] [Render thread/INFO]: OpenGL Renderer: Mali-G76 | OpenGL ES 3.2
+[11:19:23] [Render thread/INFO]: OpenGL Version: 4.0.0 MobileGlues 1.2.7
+[11:19:23] [Render thread/INFO]: [STDOUT]: [MioLibPatcher/INFO]: Patch target class: net/caffeinemc/mods/sodium/client/compatibility/checks/PostLaunchChecks
+[11:19:23] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage
+[11:19:25] [Render thread/INFO]: Hardware information:
+[11:19:25] [Render thread/INFO]: CPU: 8x kirin980
+[11:19:25] [Render thread/INFO]: GPU: Mali-G76 | OpenGL ES 3.2 (Supports OpenGL 4.0.0 MobileGlues 1.2.7)
+[11:19:25] [Render thread/INFO]: OS: Linux (Android-10)
+[11:19:26] [Render thread/INFO]: [STDOUT]: [MioLibPatcher/INFO]: Patch target class: com/mojang/text2speech/Narrator
+[11:19:26] [Render thread/INFO]: Reloading ResourceManager: vanilla, fabric, biomesoplenty, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-view-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v1, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-item-group-api-v1, fabric-key-binding-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v2, fabric-loot-api-v3, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-screen-handler-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, iris, sodium, terrablender
+[11:19:26] [Download-2/INFO]: Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: acf42a253d564355871e3de7fe22a290
+[11:19:26] [Download-2/ERROR]: Failed to fetch Realms feature flags
+net.minecraft.class_4355: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: acf42a253d564355871e3de7fe22a290'
+	at knot/net.minecraft.class_4341.method_20998(class_4341.java:536) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_4341.method_68466(class_4341.java:189) ~[client-intermediary.jar:?]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source) ~[?:?]
+	at java.base/java.lang.Thread.run(Unknown Source) [?:?]
+[11:19:27] [Worker-Main-5/INFO]: Found unifont_pua-16.0.03.hex, loading
+[11:19:27] [Worker-Main-3/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[11:19:28] [Worker-Main-6/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[11:19:33] [Render thread/INFO]: OpenAL initialized on device Oboe Default
+[11:19:33] [Render thread/INFO]: Sound engine started
+[11:19:33] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/blocks.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/signs.png-atlas
+[11:19:33] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[11:19:34] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[11:19:35] [IO-Worker-1/INFO]: Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: acf42a253d564355871e3de7fe22a290
+[11:19:35] [IO-Worker-1/ERROR]: Couldn't connect to realms
+net.minecraft.class_4355: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: acf42a253d564355871e3de7fe22a290'
+	at knot/net.minecraft.class_4341.method_20998(class_4341.java:536) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_4341.method_21027(class_4341.java:316) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_8647.method_52627(class_8647.java:49) ~[client-intermediary.jar:?]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source) ~[?:?]
+	at java.base/java.lang.Thread.run(Unknown Source) [?:?]
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:dead_hanging_sign' from 'biomesoplenty:recipe/dead_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:empyreal_hanging_sign' from 'biomesoplenty:recipe/empyreal_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:fir_hanging_sign' from 'biomesoplenty:recipe/fir_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:hellbark_hanging_sign' from 'biomesoplenty:recipe/hellbark_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:jacaranda_hanging_sign' from 'biomesoplenty:recipe/jacaranda_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:magic_hanging_sign' from 'biomesoplenty:recipe/magic_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:mahogany_hanging_sign' from 'biomesoplenty:recipe/mahogany_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:maple_hanging_sign' from 'biomesoplenty:recipe/maple_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:origin_oak_hanging_sign' from 'biomesoplenty:recipe/origin_oak_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:palm_hanging_sign' from 'biomesoplenty:recipe/palm_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:pine_hanging_sign' from 'biomesoplenty:recipe/pine_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:redwood_hanging_sign' from 'biomesoplenty:recipe/redwood_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:umbran_hanging_sign' from 'biomesoplenty:recipe/umbran_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:46] [Worker-Main-5/ERROR]: Couldn't parse data file 'biomesoplenty:willow_hanging_sign' from 'biomesoplenty:recipe/willow_hanging_sign.json': DataResult.Error['Map entry 'X' : Failed to parse either. First: Not a JSON object: "minecraft:chain"; Second: Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:19:47] [Render thread/INFO]: Loaded 1788 recipes
+[11:19:47] [Render thread/INFO]: Loaded 1917 advancements
+[11:19:47] [Render thread/INFO]: Initialized TerraBlender biomes for level stem minecraft:the_nether
+[11:19:49] [Render thread/INFO]: Initialized TerraBlender biomes for level stem minecraft:overworld
+[11:19:49] [Render thread/INFO]: Applied 0 biome modifications to 0 of 134 new biomes in 6.688 ms
+[11:19:49] [Server thread/INFO]: Starting integrated minecraft server version 1.21.9
+[11:19:49] [Server thread/INFO]: Generating keypair
+[11:19:50] [Server thread/INFO]: Loading 0 persistent chunks...
+[11:19:50] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:51] [Render thread/INFO]: [STDOUT]: [MioLibPatcher/INFO]: Patch target class: io/netty/util/internal/PlatformDependent
+[11:19:51] [Render thread/INFO]: Your platform does not provide complete low-level API for accessing direct buffers reliably. Unless explicitly requested, heap buffer will always be preferred to avoid potential system instability.
+[11:19:51] [Render thread/WARN]: Failed to find a usable hardware address from the network interfaces; using random bytes: ****:****:****:****:****:****:****:****
+[11:19:53] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[11:19:53] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:53] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:53] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:53] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:53] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:53] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:54] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:54] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:55] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:55] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:56] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:56] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:57] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:57] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:58] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:58] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:59] [Server thread/INFO]: 准备生成区域中：16%
+[11:19:59] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:00] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:00] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:01] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:01] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:02] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:02] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:03] [Server thread/INFO]: 准备生成区域中：16%
+[11:20:04] [Server thread/INFO]: 准备生成区域中：98%
+[11:20:04] [Server thread/INFO]: Time elapsed: 13113 ms
+[11:20:05] [Server thread/INFO]: sjjabiw[local:E:9985e6ac] logged in with entity id 173 at (-7.300000011920929, 65.0, -6.300000011920929)
+[11:20:05] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[11:20:05] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[11:20:05] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[11:20:05] [Server thread/INFO]: sjjabiw加入了游戏
+[11:20:06] [Render thread/ERROR]: Failed to handle packet class_2678[playerId=173, hardcore=false, levels=[ResourceKey[minecraft:dimension / minecraft:the_end], ResourceKey[minecraft:dimension / minecraft:overworld], ResourceKey[minecraft:dimension / minecraft:the_nether]], maxPlayers=8, chunkRadius=10, simulationDistance=0, reducedDebugInfo=false, showDeathScreen=true, doLimitedCrafting=false, commonPlayerSpawnInfo=class_8589[dimensionType=Reference{ResourceKey[minecraft:dimension_type / minecraft:overworld]=class_2874[fixedTime=OptionalLong.empty, hasSkyLight=true, hasCeiling=false, ultraWarm=false, natural=true, coordinateScale=1.0, bedWorks=true, respawnAnchorWorks=false, minY=-64, height=384, logicalHeight=384, infiniburn=TagKey[minecraft:block / minecraft:infiniburn_overworld], effectsLocation=minecraft:overworld, ambientLight=0.0, cloudHeight=Optional[192], monsterSettings=class_7512[piglinSafe=false, hasRaids=true, monsterSpawnLightTest=[0-7], monsterSpawnBlockLightLimit=0]]}, dimension=ResourceKey[minecraft:dimension / minecraft:overworld], seed=-7175373930117398063, gameType=CREATIVE, previousGameType=null, isDebug=false, isFlat=false, lastDeathLocation=Optional.empty, portalCooldown=0, seaLevel=63], enforcesSecureChat=false], disconnecting
+java.lang.RuntimeException: Mixin transformation of net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager failed
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:440) ~[fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) ~[fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.19.3.jar:?]
+	at java.base/java.lang.ClassLoader.loadClass(Unknown Source) ~[?:?]
+	at knot/net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.initRenderer(SodiumWorldRenderer.java:312) ~[sodium-fabric-0.7.3+mc1.21.10.jar:?]
+	at knot/net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.loadLevel(SodiumWorldRenderer.java:131) ~[sodium-fabric-0.7.3+mc1.21.10.jar:?]
+	at knot/net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.setLevel(SodiumWorldRenderer.java:123) ~[sodium-fabric-0.7.3+mc1.21.10.jar:?]
+	at knot/net.minecraft.class_761.handler$bij000$sodium$onWorldChanged(class_761.java:7093) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_761.method_3244(class_761.java:268) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_18097(class_310.java:2318) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_1481(class_310.java:2179) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_634.method_11120(class_634.java:519) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_2678.method_11567(class_2678.java:69) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_2678.method_65081(class_2678.java:17) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_11980$class_11981.method_74450(class_11980.java:55) [client-intermediary.jar:?]
+	at knot/net.minecraft.class_11980.method_74449(class_11980.java:38) [client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_1523(class_310.java:1338) [client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_1514(class_310.java:969) [client-intermediary.jar:?]
+	at knot/net.minecraft.client.main.Main.main(Main.java:250) [client-intermediary.jar:?]
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514) [fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.19.3.jar:?]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source) ~[?:?]
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source) ~[?:?]
+	at mio.Wrapper.main(Wrapper.java:21) [MioLaunchWrapper.jar:?]
+Caused by: org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error was encountered
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:380) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:237) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) ~[fabric-loader-0.19.3.jar:?]
+	... 25 more
+Caused by: org.spongepowered.asm.mixin.injection.throwables.InjectionError: Critical injection failure: Redirector useShadowRenderList(Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;Lnet/caffeinemc/mods/sodium/client/render/chunk/lists/SortedRenderLists;)V in mixins.iris.compat.sodium.json:MixinRenderSectionManagerShadow from mod iris failed injection check, (0/1) succeeded. Scanned 0 target(s). No refMap loaded.
+	at org.spongepowered.asm.mixin.injection.struct.InjectionInfo.postInject(InjectionInfo.java:531) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTargetContext.applyInjections(MixinTargetContext.java:1477) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.applyInjections(MixinApplicatorStandard.java:832) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.lambda$runApplicatorPass$7(MixinApplicatorStandard.java:362) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.processMixins(MixinApplicatorStandard.java:381) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.runApplicatorPass(MixinApplicatorStandard.java:360) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.apply(MixinApplicatorStandard.java:240) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.TargetClassContext.apply(TargetClassContext.java:437) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.TargetClassContext.applyMixins(TargetClassContext.java:418) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:351) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:237) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) ~[sponge-mixin-0.17.3+mixin.0.8.7.jar:0.17.3+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) ~[fabric-loader-0.19.3.jar:?]
+	... 25 more
+[11:20:07] [Server thread/INFO]: Changing view distance to 2, from 10
+[11:20:07] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[11:20:07] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 2243ms or 44 ticks behind
+[11:20:08] [Render thread/ERROR]: Unreported exception thrown!
+java.lang.NullPointerException: Cannot invoke "net.minecraft.class_746.method_31548()" because "this.field_3712.field_1724" is null
+	at knot/net.minecraft.class_636.method_2911(class_636.java:308) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_636.method_2927(class_636.java:291) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_1574(class_310.java:1850) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_1523(class_310.java:1345) ~[client-intermediary.jar:?]
+	at knot/net.minecraft.class_310.method_1514(class_310.java:969) [client-intermediary.jar:?]
+	at knot/net.minecraft.client.main.Main.main(Main.java:250) [client-intermediary.jar:?]
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514) [fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.19.3.jar:?]
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.19.3.jar:?]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source) ~[?:?]
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source) ~[?:?]
+	at mio.Wrapper.main(Wrapper.java:21) [MioLaunchWrapper.jar:?]
+[11:20:08] [Server thread/INFO]: sjjabiw lost connection: 连接中断
+[11:20:08] [Server thread/INFO]: sjjabiw退出了游戏
+[11:20:08] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[11:20:08] [Server thread/INFO]: Stopping server
+[11:20:08] [Server thread/INFO]: Saving players
+[11:20:08] [Server thread/INFO]: Saving worlds
+[11:20:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:overworld
+[11:20:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_end
+[11:20:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_nether
+[11:20:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (新的世界): All chunks are saved
+[11:20:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[11:20:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[11:20:11] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+---- Minecraft Crash Report ----
+// Don't do that.
+
+Time: 2026-07-24 11:20:11
+Description: Unexpected error
+
+java.lang.NullPointerException: Cannot invoke "net.minecraft.class_746.method_31548()" because "this.field_3712.field_1724" is null
+	at knot//net.minecraft.class_636.method_2911(class_636.java:308)
+	at knot//net.minecraft.class_636.method_2927(class_636.java:291)
+	at knot//net.minecraft.class_310.method_1574(class_310.java:1850)
+	at knot//net.minecraft.class_310.method_1523(class_310.java:1345)
+	at knot//net.minecraft.class_310.method_1514(class_310.java:969)
+	at knot//net.minecraft.client.main.Main.main(Main.java:250)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at mio.Wrapper.main(Wrapper.java:21)
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+	at knot//net.minecraft.class_636.method_2911(class_636.java:308)
+	at knot//net.minecraft.class_636.method_2927(class_636.java:291)
+
+-- Uptime --
+Details:
+	JVM uptime: 77.924s
+	Wall uptime: 54.103s
+	High-res time: 49.146s
+	Client ticks: 560 ticks / 28.000s
+Stacktrace:
+	at knot//net.minecraft.class_310.method_1587(class_310.java:2434)
+	at knot//net.minecraft.class_310.method_54580(class_310.java:1038)
+	at knot//net.minecraft.class_310.method_1514(class_310.java:993)
+	at knot//net.minecraft.client.main.Main.main(Main.java:250)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at mio.Wrapper.main(Wrapper.java:21)
+
+-- Affected level --
+Details:
+	All players: 0 total; 
+	Chunk stats: 729, 0
+	Level dimension: minecraft:overworld
+	Level spawn location: World: (8,64,8), Section: (at 8,0,8 in 0,4,0; chunk contains blocks 0,-64,0 to 15,319,15), Region: (0,0; contains chunks 0,0 to 31,31, blocks 0,-64,0 to 511,319,511)
+	Level time: 0 game time, 0 day time
+	Server brand: ~~ERROR~~ NullPointerException: Cannot read field "field_3944" because "this.field_3729.field_1724" is null
+	Server type: Integrated singleplayer server
+	Tracked entity count: 0
+
+-- Last reload --
+Details:
+	Reload number: 1
+	Reload reason: initial
+	Finished: Yes
+	Packs: vanilla, fabric, biomesoplenty, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-view-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v1, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-item-group-api-v1, fabric-key-binding-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v2, fabric-loot-api-v3, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-screen-handler-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, iris, sodium, terrablender
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.9
+	Minecraft Version ID: 1.21.9
+	Operating System: Linux (aarch64) version Android-10
+	Java Version: 21.0.1-internal, N/A
+	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode), Oracle Corporation
+	Memory: 1713187784 bytes (1633 MiB) / 2147483648 bytes (2048 MiB) up to 2388656128 bytes (2278 MiB)
+	CPUs: 8
+	Processor Vendor: HiSilicon
+	Processor Name: kirin980
+	Identifier: 0x48 Family 8 Model 0xd40 Stepping r1p0
+	Microarchitecture: unknown
+	Frequency (GHz): -0.00
+	Number of physical packages: 3
+	Number of physical CPUs: 8
+	Number of logical CPUs: 8
+	Graphics card #0 name: unknown
+	Graphics card #0 vendor: unknown
+	Graphics card #0 VRAM (MiB): 0.00
+	Graphics card #0 deviceId: unknown
+	Graphics card #0 versionInfo: unknown
+	Virtual memory max (MiB): 7899.23
+	Virtual memory used (MiB): 8410.86
+	Swap memory total (MiB): 4096.00
+	Swap memory used (MiB): 2224.61
+	Space in storage for jna.tmpdir (MiB): available: 9291.65, total: 113398.00
+	Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): available: 9291.65, total: 113398.00
+	Space in storage for io.netty.native.workdir (MiB): available: 9291.65, total: 113398.00
+	Space in storage for java.io.tmpdir (MiB): available: 9291.65, total: 113398.00
+	Space in storage for workdir (MiB): available: 9271.65, total: 113378.00
+	JVM Flags: 4 total; -Xbootclasspath/a:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-agent.jar:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-shared-1.19.1-SNAPSHOT.jar:/data/user/0/com.tungsten.fcl/app_runtime/caciocavallo17/cacio-tta-1.19.1-SNAPSHOT.jar -Xmx2277m -Xms2048m -XX:ActiveProcessorCount=8
+	Debug Flags: 0 total; 
+	Fabric Mods: 
+		biomesoplenty: BiomesOPlenty **.**.**.**
+			com_electronwill_night-config_core: core 3.6.7
+			com_electronwill_night-config_toml: toml 3.6.7
+			net_jodah_typetools: typetools 0.6.3
+		fabric-api: Fabric API 0.134.1+1.21.9
+			fabric-api-base: Fabric API Base 1.0.0+14b92d897d
+			fabric-api-lookup-api-v1: Fabric API Lookup API (v1) 1.6.106+d17682157d
+			fabric-biome-api-v1: Fabric Biome API (v1) 16.1.0+c2417d4f7d
+			fabric-block-api-v1: Fabric Block API (v1) 1.1.5+d17682157d
+			fabric-block-view-api-v2: Fabric BlockView API (v2) 1.0.34+e4fd1b927d
+			fabric-command-api-v2: Fabric Command API (v2) 2.3.7+328a75ba7d
+			fabric-content-registries-v0: Fabric Content Registries (v0) 10.2.3+b6a242647d
+			fabric-convention-tags-v1: Fabric Convention Tags 2.1.47+7f945d5b7d
+			fabric-convention-tags-v2: Fabric Convention Tags (v2) 2.15.12+3154c1c87d
+			fabric-crash-report-info-v1: Fabric Crash Report Info (v1) 0.3.18+33df5e6e7d
+			fabric-data-attachment-api-v1: Fabric Data Attachment API (v1) 1.8.28+9bce411b7d
+			fabric-data-generation-api-v1: Fabric Data Generation API (v1) 23.2.22+d8b85ef17d
+			fabric-dimensions-v1: Fabric Dimensions API (v1) 4.0.22+38b9cc197d
+			fabric-entity-events-v1: Fabric Entity Events (v1) 2.1.12+14b92d897d
+			fabric-events-interaction-v0: Fabric Events Interaction (v0) 4.0.35+5ba217127d
+			fabric-game-rule-api-v1: Fabric Game Rule API (v1) 1.1.1+e47eaae57d
+			fabric-item-api-v1: Fabric Item API (v1) 11.5.8+9bce411b7d
+			fabric-item-group-api-v1: Fabric Item Group API (v1) 4.2.24+86b3ae577d
+			fabric-key-binding-api-v1: Fabric Key Binding API (v1) 1.1.1+b3ba9c487d
+			fabric-lifecycle-events-v1: Fabric Lifecycle Events (v1) 2.6.9+33df5e6e7d
+			fabric-loot-api-v2: Fabric Loot API (v2) 3.0.64+3f89f5a57d
+			fabric-loot-api-v3: Fabric Loot API (v3) 2.0.11+d17682157d
+			fabric-message-api-v1: Fabric Message API (v1) 6.1.7+3154c1c87d
+			fabric-model-loading-api-v1: Fabric Model Loading API (v1) 6.0.1+3ffd6ef07d
+			fabric-networking-api-v1: Fabric Networking API (v1) 5.0.13+d269470c7d
+			fabric-object-builder-api-v1: Fabric Object Builder API (v1) 21.1.24+9bce411b7d
+			fabric-particles-v1: Fabric Particles (v1) 4.2.2+a0ee59a47d
+			fabric-recipe-api-v1: Fabric Recipe API (v1) 8.1.26+d17682157d
+			fabric-registry-sync-v0: Fabric Registry Sync (v0) 6.1.41+679c8c5c7d
+			fabric-renderer-api-v1: Fabric Renderer API (v1) 7.1.2+c523dc837d
+			fabric-renderer-indigo: Fabric Renderer - Indigo 4.0.20+c523dc837d
+			fabric-rendering-fluids-v1: Fabric Rendering Fluids (v1) 3.1.38+86b3ae577d
+			fabric-resource-conditions-api-v1: Fabric Resource Conditions API (v1) 5.0.28+33df5e6e7d
+			fabric-screen-api-v1: Fabric Screen API (v1) 3.1.0+9c82a7987d
+			fabric-screen-handler-api-v1: Fabric Screen Handler API (v1) 1.3.150+d17682157d
+			fabric-serialization-api-v1: Fabric Serialization API (v1) 1.0.0+d857c9767d
+			fabric-sound-api-v1: Fabric Sound API (v1) 1.0.45+328a75ba7d
+			fabric-tag-api-v1: Fabric Tag API (v1) 1.2.10+2fa446b27d
+			fabric-transfer-api-v1: Fabric Transfer API (v1) 6.0.15+79ec2c127d
+			fabric-transitive-access-wideners-v1: Fabric Transitive Access Wideners (v1) 6.5.3+41eb43437d
+		fabricloader: Fabric Loader 0.19.3
+			mixinextras: MixinExtras 0.5.4
+		glitchcore: GlitchCore **.**.**.**
+		iris: Iris 1.9.3+mc1.21.9
+			io_github_douira_glsl-transformer: glsl-transformer 3.0.0-pre3
+			org_anarres_jcpp: jcpp 1.4.14
+			org_antlr_antlr4-runtime: antlr4-runtime 4.13.1
+		java: OpenJDK 64-Bit Server VM 21
+		minecraft: Minecraft 1.21.9
+		sodium: Sodium 0.7.3+mc1.21.10
+			fabric-rendering-v1: Fabric Rendering (v1) 16.0.2+91152d886f
+			fabric-resource-loader-v0: Fabric Resource Loader (v0) 3.2.3+3388a3b26f
+			fabric-resource-loader-v1: Fabric Resource Loader (v1) 1.0.3+8cc86c156f
+		terrablender: TerraBlender **.**.**.**
+	Loaded Shaderpack: (off)
+	Launched Version: 1.21.9-Fabric
+	Launcher name: Fold Craft Launcher
+	Backend library: LWJGL version 3.3.6-snapshot
+	Backend API: Mali-G76 | OpenGL ES 3.2 GL version 4.0.0 MobileGlues 1.2.7, Swung0x48, BZLZHH, Tungsten
+	Window size: 2340x1080
+	GFLW Platform: x11
+	Render Extensions: GL_ARB_buffer_storage
+	GL debug messages: <debugging unavailable>
+	Is Modded: Definitely; Client brand changed to 'fabric'; Server brand changed to 'fabric'
+	Universe: 400921fb54442d18
+	Type: Integrated Server (map_client.txt)
+	Graphics mode: fast
+	Render Distance: 2/2 chunks
+	Resource Packs: vanilla, fabric, biomesoplenty (incompatible), fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-view-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v1, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-item-group-api-v1, fabric-key-binding-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v2, fabric-loot-api-v3, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-screen-handler-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, iris, sodium, terrablender (incompatible)
+	Current Language: zh_cn
+	Locale: zh_CN
+	System encoding: UTF-8
+	File encoding: UTF-8
+	CPU: 8x kirin980
+	Server Running: false
+	Player Count: 0 / 8; []
+	Active Data Packs: vanilla, fabric, biomesoplenty (incompatible), fabric-convention-tags-v2, terrablender (incompatible)
+	Available Data Packs: biomesoplenty (incompatible), fabric, fabric-convention-tags-v2, minecart_improvements, redstone_experiments, terrablender (incompatible), trade_rebalance, vanilla
+	Enabled Feature Flags: minecraft:vanilla
+	World Generation: Stable
+	World Seed: 6966282503284339811
+	Suppressed Exceptions: ~~NONE~~
+#@!@# Game crashed! Crash report saved to: #@!@# /storage/emulated/0/Android/data/com.tungsten.fcl/files/.minecraft/crash-reports/crash-2026-07-24_11.20.11-client.txt
+
+OpenJDK exited with code : -1

@@ -1,0 +1,7 @@
+v1	official	intermediary	named
+CLASS	a	net/minecraft/class_1799	net/minecraft/item/ItemStack
+CLASS	aa	net/minecraft/class_1297	net/minecraft/entity/Entity
+FIELD	a	I	count	field_8008	size
+FIELD	aa	F	health	field_3639	health
+METHOD	a	()I	getCount	method_1234	getCount
+METHOD	aa	()V	tick	method_6004	tick

@@ -1,0 +1,10 @@
+tiny	2	0	official	intermediary	named
+c	net/minecraft/world/item/ItemStack	net/minecraft/class_1799	net/minecraft/item/ItemStack
+	f	I	net/minecraft/world/item/ItemStack	field_8008	size
+	f	Lnet/minecraft/item/ItemStack;	net/minecraft/world/item/ItemStack	field_7719	stack
+	m	()I	net/minecraft/world/item/ItemStack	method_1234	getCount
+	m	(Lnet/minecraft/class_1799;)V	net/minecraft/world/item/ItemStack	method_7720	setStack
+c	net/minecraft/world/entity/Entity	net/minecraft/class_1297	net/minecraft/entity/Entity
+	f	F	net/minecraft/world/entity/Entity	field_3639	health
+	m	()V	net/minecraft/world/entity/Entity	method_6004	tick
+	m	(FFF)V	net/minecraft/world/entity/Entity	method_7294	setHealth
