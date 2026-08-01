@@ -58,24 +58,6 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Cache bundled mappings
-        id: mappings-cache
-        uses: actions/cache@v4
-        with:
-          path: mappings
-          key: yarn-mappings-v1
-
-      - name: Download bundled mappings
-        if: steps.mappings-cache.outputs.cache-hit != 'true'
-        run: bash scripts/download_mappings.sh
-
-      - name: Verify mappings
-        shell: bash
-        run: |
-          ls -lh mappings/ || { echo "ERROR: mappings/ directory missing"; exit 1; }
-          ls mappings/*.tiny.gz >/dev/null 2>&1 || { echo "ERROR: No mapping files"; exit 1; }
-          echo "Mappings OK"
-
       - name: Install aarch64 cross-compiler
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |

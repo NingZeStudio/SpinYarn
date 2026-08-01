@@ -1,9 +1,6 @@
 # Rust build artifacts
 /target
 
-# Bundled mappings (download via scripts/download_mappings.sh before building)
-/mappings
-
 # Logs & temp
 *.log
 *.log.txt

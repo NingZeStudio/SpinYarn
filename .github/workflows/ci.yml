@@ -23,16 +23,6 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      # Must run before any build: build.rs embeds the mappings/ files.
-      - name: Download bundled mappings
-        run: bash scripts/download_mappings.sh
-
-      - name: Verify mappings
-        run: |
-          ls -lh mappings/ || { echo "ERROR: mappings/ directory missing"; exit 1; }
-          ls mappings/*.tiny.gz >/dev/null 2>&1 || { echo "ERROR: No mapping files found"; exit 1; }
-          echo "Mappings OK"
-
       - name: Check
         run: cargo check --all-targets
 
