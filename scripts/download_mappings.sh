@@ -1,5 +1,5 @@
 #!/bin/bash
-set -uo pipefail
+set -euo pipefail
 
 MAPPINGS_DIR="$(cd "$(dirname "$0")/../mappings" && pwd)"
 MAVEN_BASE="https://maven.fabricmc.net/net/fabricmc/yarn"

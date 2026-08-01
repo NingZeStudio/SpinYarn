@@ -29,9 +29,9 @@ jobs:
 
       - name: Verify mappings
         run: |
-          ls -lh mappings/
-          echo "Found $(ls mappings/*.tiny.gz 2>/dev/null | wc -l) mapping files"
-          test $(ls mappings/*.tiny.gz 2>/dev/null | wc -l) -gt 0 || { echo "ERROR: No mapping files found"; exit 1; }
+          ls -lh mappings/ || { echo "ERROR: mappings/ directory missing"; exit 1; }
+          ls mappings/*.tiny.gz >/dev/null 2>&1 || { echo "ERROR: No mapping files found"; exit 1; }
+          echo "Mappings OK"
 
       - name: Check
         run: cargo check --all-targets

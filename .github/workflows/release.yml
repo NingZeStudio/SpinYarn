@@ -72,9 +72,9 @@ jobs:
       - name: Verify mappings
         shell: bash
         run: |
-          ls -lh mappings/
-          echo "Found $(ls mappings/*.tiny.gz 2>/dev/null | wc -l) mapping files"
-          test $(ls mappings/*.tiny.gz 2>/dev/null | wc -l) -gt 0 || { echo "ERROR: No mappings"; exit 1; }
+          ls -lh mappings/ || { echo "ERROR: mappings/ directory missing"; exit 1; }
+          ls mappings/*.tiny.gz >/dev/null 2>&1 || { echo "ERROR: No mapping files"; exit 1; }
+          echo "Mappings OK"
 
       - name: Install aarch64 cross-compiler
         if: matrix.target == 'aarch64-unknown-linux-gnu'
