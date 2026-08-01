@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-MAPPINGS_DIR="$(cd "$(dirname "$0")/../mappings" && pwd)"
+MAPPINGS_DIR="$(cd "$(dirname "$0")/.." && pwd)/mappings"
 MAVEN_BASE="https://maven.fabricmc.net/net/fabricmc/yarn"
 TMP_DIR="${MAPPINGS_DIR}/.tmp"
 mkdir -p "$MAPPINGS_DIR" "$TMP_DIR"
