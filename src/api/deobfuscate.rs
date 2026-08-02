@@ -16,15 +16,15 @@ use crate::{
 /// `spawn_blocking` would multiply that per in-flight request. The semaphore
 /// pins peak memory to `SPINYARN_MAX_CONCURRENCY` x one version.
 ///
-/// Default 8: LogShare's real traffic is ~1600 RPM (~27 req/s), which at
-/// ~150ms/request means a steady-state concurrency of ~4. A limit of 8 never
+/// Default 32: LogShare's real traffic is ~1600 RPM (~27 req/s), which at
+/// ~150ms/request means a steady-state concurrency of ~16. A limit of 32 never
 /// engages in steady state; it only converts burst OOM risk (~30MB per
 /// in-flight request) into short queueing.
 static GATE: Lazy<Semaphore> = Lazy::new(|| {
     let n = std::env::var("SPINYARN_MAX_CONCURRENCY")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(8);
+        .unwrap_or(32);
     Semaphore::new(n)
 });
 
@@ -36,6 +36,7 @@ pub struct DeobfuscateRequest {
 
 #[derive(serde::Serialize)]
 pub struct DeobfuscateResponse {
+    pub original: String,
     pub deobfuscated: String,
     pub stats: DeobfuscateStats,
 }
@@ -51,6 +52,7 @@ pub struct DeobfuscateStats {
 
 fn passthrough(req: DeobfuscateRequest) -> DeobfuscateResponse {
     DeobfuscateResponse {
+        original: req.content.clone(),
         deobfuscated: req.content,
         stats: DeobfuscateStats {
             version: req.version,
@@ -94,7 +96,7 @@ pub async fn handler(
         Err(e) => return Err(e),
     };
 
-    let content = req.content;
+    let content = req.content.clone();
     let deobfuscated = tokio::task::spawn_blocking(move || {
         let engine = LineEngine::new(mappings);
         engine.deobfuscate(&content)
@@ -104,6 +106,7 @@ pub async fn handler(
 
     Ok(Json(crate::api::response::ApiResponse::success(
         DeobfuscateResponse {
+            original: req.content,
             deobfuscated: deobfuscated.text,
             stats: DeobfuscateStats {
                 version: req.version,

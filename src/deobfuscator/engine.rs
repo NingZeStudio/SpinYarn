@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::deobfuscator::pattern::RESIDUAL_PATTERN;
 use crate::mapping::Mappings;
 
@@ -18,9 +20,9 @@ pub struct DeobfuscateResult {
 /// - Lookup tables are global (`method_XXXX` / `field_XXXX` are globally unique).
 /// - The engine owns no cache; build once per request and drop.
 pub struct LineEngine {
-    classes: ahash::AHashMap<String, String>,
-    methods: ahash::AHashMap<String, String>,
-    fields: ahash::AHashMap<String, String>,
+    classes: HashMap<String, String>,
+    methods: HashMap<String, String>,
+    fields: HashMap<String, String>,
 }
 
 impl LineEngine {

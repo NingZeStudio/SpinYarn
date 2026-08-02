@@ -12,7 +12,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务，利用 Fabric Yarn 映
 ```
 请求(version, content)
   → spawn_blocking 加载映射（嵌入式优先，外部目录可选覆盖）
-  → 解析 v1/v2 → 3 张全局 AHashMap（classes/methods/fields: intermediary→named）
+  → 解析 v1/v2 → 3 张全局 HashMap（classes/methods/fields: intermediary→named）
   → LineEngine：
       堆栈行 → 手写 memchr 解析 + 查表替换
       非堆栈行 → 合并正则兜底（残差）
@@ -38,7 +38,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务，利用 Fabric Yarn 映
 - **v1 平铺**：`CLASS`/`FIELD`/`METHOD`，父类列忽略（全局表不需要）
 - **v2 缩进**：`c`/`\tf`/`\tm` 层级
 - 列位置按头部命名空间名定位（兼容 1.14/1.14.1 的 `official named intermediary` 特殊列序）
-- 输出 3 张全局 `AHashMap<String,String>`（键为 `class_`/`method_`/`field_` 前缀，排除官方短名条目）
+- 输出 3 张全局 `HashMap<String,String>`（键为 `class_`/`method_`/`field_` 前缀，排除官方短名条目）
 
 ### 4. LineEngine（高性能反混淆引擎）
 `src/deobfuscator/engine.rs`，Sherlock 式结构 + Rust 极致性能：
@@ -53,11 +53,6 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务，利用 Fabric Yarn 映
 - `POST /api/v1/deobfuscate`（请求体上限 64MB，防超限）
 - `GET /api/v1/health`（status + uptime）
 管理端点（load/unload/list/version）已在 v2 移除。
-
-### 6. 并发限流 + ahash（v0.3.x 优化）
-- **并发限流**：`src/api/deobfuscate.rs::GATE` 全局 `Semaphore`，默认 8（`SPINYARN_MAX_CONCURRENCY` 可调）。无缓存模型下每个在途请求持有一整套版本表（~30MB），限流把峰值内存钉在 N×30MB，防止突发流量 OOM。默认值依据：LogShare 实际流量 ~1600 RPM（~27 req/s）×~150ms/请求 ≈ 稳态并发 4，限 8 平时不触发，只在突发时把 OOM 换成短暂排队
-- **ahash**：三张查找表用 `ahash::AHashMap`（非 std SipHash）。实测收益有限（见下），保留是因为零成本
-- **响应精简**：响应体只含 `deobfuscated` + `stats`（`original` 已移除，客户端持有原文；大日志响应体减半），handler 内不做 `content.clone()`
 
 ## 真实日志验证（1.21.9 FCL + Sodium/Iris 崩溃日志）
 `HqZnHhz.log`（69KB，717 行，含 36 处混淆名）反混淆实测：
@@ -78,16 +73,6 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务，利用 Fabric Yarn 映
 | 峰值内存 | ~30-40MB（单版本） |
 
 解析器优化：去掉每行 `collect::<Vec<&str>>()`（改用栈上小数组）+ HashMap `with_capacity` 预分配，加载成本从 ~150ms 降至 ~100ms。
-
-### 内存实测（v0.3.x 优化后，Termux，1.21.11，232KB FCL 日志）
-- 空闲基线 RSS ~6MB；单请求后 ~18MB；8 并发（=限流上限）峰值 ~152MB ≈ 8×单版本表，突发结束回落至 ~23MB
-- 多版本轮换请求（1.21.11 / 1.21.9 / 1.14.4 交替）RSS 稳定在 ~33-36MB，**无驻留累积**（无缓存模型成立）
-- 注意：RSS 回落不代表归还给 OS，是 glibc 分配器持有复用；突发后再起请求不会继续线性增长
-- 手机 CPU 冷启动 8 并发首次批量较慢（~14s，分配器扩张 + 小核调度），热身后 16 并发 ~3.2s；x86 服务器无此量级问题
-
-### ahash 前后对比实测（同机同 payload，232KB 日志，20 发均值）
-- wall：旧（SipHash）197ms → 新（ahash）191ms，**仅 ~3%**；引擎耗时两者持平（~4.15ms）
-- 结论：**每请求固定成本 ~190ms 的瓶颈不在哈希，而在字符串分配 + gzip 解压 + 内存拷贝**。ahash 保留（零成本小赚），但若要把固定成本压下去，真正有效的方向是编译期预计算表（build.rs 生成静态排序表，运行时零解析零分配）或 arena/借用分配
 
 ## 测试
 - 单元测试：`cargo test`（15 个：v1/v2 解析、键过滤、LineEngine 堆栈/描述符/透传/前缀冲突/匿名类/嵌套类/源文件名）
