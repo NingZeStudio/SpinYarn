@@ -2,6 +2,11 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [Unreleased]
+
+### 新增
+- 反混淆路径并发限流（`src/api/deobfuscate.rs::GATE`，`SPINYARN_MAX_CONCURRENCY` 可调，默认 32）：无缓存模型下每个在途请求持有 ~30MB 版本表，限流将峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
+
 ## [v0.3.0] - 2026-07-31
 
 ### 新增
