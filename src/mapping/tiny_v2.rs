@@ -1,14 +1,15 @@
-use std::collections::HashMap;
-
 /// Global deobfuscation lookup tables (intermediary -> named).
 /// Only entries whose keys match the obfuscated `class_`/`method_`/`field_`
 /// prefix are kept; entries already using readable official names (e.g. `run`,
 /// `add`) are dropped to avoid corrupting arbitrary log text.
+///
+/// Uses AHashMap: ~2x faster build/lookup than std SipHash tables, which
+/// matters because the tables are rebuilt from scratch on every request.
 #[derive(Debug, Clone, Default)]
 pub struct Mappings {
-    pub classes: HashMap<String, String>,
-    pub methods: HashMap<String, String>,
-    pub fields: HashMap<String, String>,
+    pub classes: ahash::AHashMap<String, String>,
+    pub methods: ahash::AHashMap<String, String>,
+    pub fields: ahash::AHashMap<String, String>,
 }
 
 impl Mappings {
@@ -106,9 +107,9 @@ fn collect_cols(line: &str) -> [Option<&str>; 6] {
 /// Rough pre-allocation for the three tables based on line count.
 fn prealloc(line_count: usize) -> Mappings {
     Mappings {
-        classes: HashMap::with_capacity(line_count / 10),
-        methods: HashMap::with_capacity(line_count / 2),
-        fields: HashMap::with_capacity(line_count / 2),
+        classes: ahash::AHashMap::with_capacity(line_count / 10),
+        methods: ahash::AHashMap::with_capacity(line_count / 2),
+        fields: ahash::AHashMap::with_capacity(line_count / 2),
     }
 }
 

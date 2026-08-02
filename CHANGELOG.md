@@ -2,6 +2,15 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [Unreleased]
+
+### 变更
+- 查找表改用 `ahash::AHashMap`（实测 wall 仅 ~3% 收益，瓶颈在字符串分配而非哈希；零成本保留）
+- 反混淆路径加并发限流信号量（`SPINYARN_MAX_CONCURRENCY`，默认 8），峰值内存钉在 N×单版本 ~30MB，防止突发流量 OOM
+
+### 移除
+- 响应体 `original` 字段（客户端持有原文，去掉后大日志响应体减半），同时消除 handler 中的 `content.clone()`
+
 ## [v0.3.0] - 2026-07-31
 
 ### 新增
