@@ -39,11 +39,12 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 ## 测试
 
 ```bash
-cargo test              # 单元测试（tests/ 目录，含 fixtures）
+cargo test              # 单元测试（tests/ 目录，含 fixtures 与快照回归）
 bash test.sh            # 集成测试（需先构建 release 二进制）
 ```
 
-集成测试依赖 `jq` 和 `curl`。服务端口被占用时自动 +1 递增，不会启动失败。
+- 单元测试：引擎/解析器边界场景 + **真实日志快照回归**（`tests/snapshot_test.rs`：对 `tests/fixtures/` 真实日志反混淆，与 `tests/snapshots/` 逐字节对比，防引擎行为漂移；引擎有意变更输出时删除/重建对应 `.snap` 文件）
+- 集成测试依赖 `jq` 和 `curl`。服务端口被占用时自动 +1 递增，不会启动失败。
 
 ## CI / Release
 

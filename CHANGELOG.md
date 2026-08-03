@@ -18,6 +18,9 @@
 - **配置统一**：`server.max_body_size`（默认 64MB）/`server.max_concurrency`（默认 32）纳入 `config.toml`，环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 作兜底；并发信号量由静态 `GATE` 改为 `AppState` 注入
 - **映射外置**：移除 `build.rs`/`embedded.rs`，映射不再嵌入二进制（二进制 43MB → ~6MB），默认从二进制同级 `./mappings/` 加载；`config.toml` 优先从二进制同级目录查找
 
+### 测试
+- 真实日志快照回归（`tests/snapshot_test.rs`）：对 `1.21.9-crash.log`、`1.21.11-fcl.log.txt` 反混淆并与 `tests/snapshots/` 逐字节对比，防引擎行为漂移
+
 ### 文档
 - `docs/yarn_unmapped_stats.csv`：43 版本 Yarn 未命名键统计（METHOD 34.2% / FIELD 33.2% / CLASS 0.5%），按方法未命名率降序排列
 
