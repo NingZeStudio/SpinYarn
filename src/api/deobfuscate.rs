@@ -1,36 +1,17 @@
 use axum::{
+    extract::State,
     http::{header, HeaderMap, HeaderValue},
     response::{IntoResponse, Response},
     Json,
 };
-use once_cell::sync::Lazy;
 use serde::Deserialize;
-use tokio::sync::Semaphore;
 
 use crate::{
+    api::AppState,
     deobfuscator::LineEngine,
     error::ApiError,
-    mapping::{download::load_mappings, Mappings},
+    mapping::{download::{is_version_supported, load_mappings}, Mappings},
 };
-
-/// Concurrency gate for the heavy load+deobfuscate path.
-///
-/// There is no mapping cache by design: each concurrent request holds a full
-/// per-version table set (~30MB). On memory-constrained hosts, unbounded
-/// `spawn_blocking` would multiply that per in-flight request. The semaphore
-/// pins peak memory to `SPINYARN_MAX_CONCURRENCY` x one version.
-///
-/// Default 32: LogShare's real traffic is ~1600 RPM (~27 req/s), which at
-/// ~150ms/request means a steady-state concurrency of ~16. A limit of 32 never
-/// engages in steady state; it only converts burst OOM risk (~30MB per
-/// in-flight request) into short queueing.
-static GATE: Lazy<Semaphore> = Lazy::new(|| {
-    let n = std::env::var("SPINYARN_MAX_CONCURRENCY")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(32);
-    Semaphore::new(n)
-});
 
 #[derive(Debug, Deserialize)]
 pub struct DeobfuscateRequest {
@@ -70,8 +51,8 @@ fn passthrough_stats(version: String) -> DeobfuscateStats {
 
 /// Shared pipeline for both JSON and plain-text handlers:
 /// passthrough check -> concurrency gate -> load mappings -> deobfuscate.
-async fn process(req: DeobfuscateRequest) -> Result<DeobfuscateOutcome, ApiError> {
-    if !crate::config::SUPPORTED_VERSIONS.contains(req.version.as_str()) {
+async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<DeobfuscateOutcome, ApiError> {
+    if !is_version_supported(&req.version, &state.mappings_dir) {
         return Ok(DeobfuscateOutcome {
             text: req.content,
             stats: passthrough_stats(req.version),
@@ -79,17 +60,19 @@ async fn process(req: DeobfuscateRequest) -> Result<DeobfuscateOutcome, ApiError
     }
 
     // Bound peak memory: at most N in-flight mapping table sets.
-    let _permit = GATE
+    let _permit = state
+        .gate
         .acquire()
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let version = req.version.clone();
     let content = req.content;
+    let mappings_dir = state.mappings_dir.clone();
 
     // CPU-bound: gzip decompress + parse.
     let loaded: Result<Option<Mappings>, ApiError> = tokio::task::spawn_blocking(move || {
-        load_mappings(&version).map_err(|e| ApiError::Internal(e.to_string()))
+        load_mappings(&version, &mappings_dir).map_err(|e| ApiError::Internal(e.to_string()))
     })
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -127,9 +110,10 @@ async fn process(req: DeobfuscateRequest) -> Result<DeobfuscateOutcome, ApiError
 
 #[axum::debug_handler]
 pub async fn handler(
+    State(state): State<AppState>,
     Json(req): Json<DeobfuscateRequest>,
 ) -> Result<Json<crate::api::response::ApiResponse<DeobfuscateResponse>>, ApiError> {
-    let outcome = process(req).await?;
+    let outcome = process(req, &state).await?;
     Ok(Json(crate::api::response::ApiResponse::success(
         DeobfuscateResponse {
             deobfuscated: outcome.text,
@@ -140,9 +124,10 @@ pub async fn handler(
 
 #[axum::debug_handler]
 pub async fn handler_plain(
+    State(state): State<AppState>,
     Json(req): Json<DeobfuscateRequest>,
 ) -> Result<Response, ApiError> {
-    let outcome = process(req).await?;
+    let outcome = process(req, &state).await?;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,

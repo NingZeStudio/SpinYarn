@@ -6,7 +6,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 
 - **单文件部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射**编译期嵌入二进制**（~41MB），部署只需拷贝一个可执行文件
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，内存恒定 ~30-40MB，不随请求版本数增长
-- **并发限流**：`SPINYARN_MAX_CONCURRENCY`（默认 32）信号量把峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
+- **并发限流**：`server.max_concurrency`（默认 32）信号量把峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
 - **高性能**：手写 memchr 堆栈解析 + 预编译正则兜底（带 memchr 快速过滤，无键行零成本直通），真实 5MB 日志引擎处理 ~30ms
 - **模块前缀处理**：`knot/`、`knot//` 模块前缀、嵌套类、源文件名、描述符、`(Native Method)`/`(Unknown Source)` 全覆盖
 - **嵌套类裸键**：`class_7512` 这类缺外层的嵌套键通过反向索引解析为 `DimensionType$MonsterSettings`
@@ -32,7 +32,18 @@ cargo build --release
 # 默认监听 127.0.0.1:14523；端口被占用时自动 +1 递增直至找到空闲端口
 ```
 
-配置可通过 `config.toml`（`server.host`/`server.port`/`maven.mappings_dir`）或环境变量 `SPINYARN_MAPPINGS_DIR` 覆盖。
+配置可通过 `config.toml`（`server.host`/`server.port`/`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir`）配置；`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir` 未配置时分别由环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 兜底。
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 14523
+max_body_size = 67108864   # 64MB，默认
+max_concurrency = 32       # 默认
+
+[maven]
+mappings_dir = "./mappings"
+```
 
 ## API
 
@@ -89,7 +100,7 @@ curl -X POST /api/v1/deobfuscate/plain \
 
 ## 支持版本
 
-内置 43 个版本：1.14 ~ 1.21.11（完整列表见 `src/config.rs::SUPPORTED_VERSIONS`）。其余版本透传。
+**无硬编码版本清单**：运行时可反混淆的版本 = 嵌入式映射表（编译期嵌入 43 个版本：1.14 ~ 1.21.11）∪ 外部映射目录中的 `<version>.tiny.gz`。两者都没有的版本**原样透传**（`success: true`，计数为 0）。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。
 
 ## 性能（Termux arm64，release 实测）
 

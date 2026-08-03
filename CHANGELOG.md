@@ -14,6 +14,8 @@
 ### 变更
 - **breaking change**：`/api/v1/deobfuscate` 响应移除 `original` 字段（客户端持有原文），仅返回 `deobfuscated` + `stats`
 - 引擎性能优化：非堆栈行进正则前先 `contains` 快速过滤，无混淆键的行零成本直通，真实 5MB 日志引擎耗时 ~95ms → ~30ms
+- **版本动态推断**：删除 `SUPPORTED_VERSIONS` 硬编码清单，运行时按嵌入式表 / 外部映射目录判断，往 `mappings/` 新增版本文件（含 pre-release）自动生效
+- **配置统一**：`server.max_body_size`（默认 64MB）/`server.max_concurrency`（默认 32）纳入 `config.toml`，环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 作兜底；并发信号量由静态 `GATE` 改为 `AppState` 注入
 
 ### 文档
 - `docs/yarn_unmapped_stats.csv`：43 版本 Yarn 未命名键统计（METHOD 34.2% / FIELD 33.2% / CLASS 0.5%），按方法未命名率降序排列

@@ -5,7 +5,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 ## 架构要点
 
 - **无缓存模型**：每请求按 version 独立加载映射 → 反混淆 → 释放，内存恒定 ~30MB
-- **并发限流**：`src/api/deobfuscate.rs::GATE` 全局 `Semaphore`，默认 32（`SPINYARN_MAX_CONCURRENCY` 环境变量可调）。无缓存模型下每并发请求持有一整套版本表（~30MB），限流把峰值内存钉在 N×30MB，突发流量 OOM 换成短暂排队（稳态并发约 16，平时不触发）
+- **并发限流**：`src/api/mod.rs::AppState` 的 `Semaphore`，默认 32（`config.toml` 的 `server.max_concurrency` 可调，未配置时 `SPINYARN_MAX_CONCURRENCY` 环境变量兜底）。无缓存模型下每并发请求持有一整套版本表（~30MB），限流把峰值内存钉在 N×30MB，突发流量 OOM 换成短暂排队（稳态并发约 16，平时不触发）
 - **缓存决策**：LogShare 流量为长尾分布（版本跨度大、无稳定热点），LRU 缓存会被烫成全量缓存（43 版本 × ~30MB ≈ 1.3GB+），已否决。短 TTL 缓存（按 version 缓存 60s + 条目上限）为备选方案，**待收尾实装后按线上表现评估**，在此之前维持无缓存；若未来服务器升级至能承受全量缓存的内存当量，直接上全量缓存亦可
 - CPU 密集操作（gzip 解压 + 解析 + 反混淆）放入 `tokio::task::spawn_blocking`，不阻塞 runtime
 - **访问日志中间件**：`tower_http::TraceLayer` 记录每个请求的 method/uri/status/耗时。deobfuscate 走 INFO，health 探针走 DEBUG（避免噪音）
@@ -15,15 +15,15 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 ## 关键约定
 
 ### 内置版本 + 透传
-`src/config.rs::SUPPORTED_VERSIONS` 硬编码 1.14 ~ 1.21.11 共 43 个版本。请求版本不在列表内 → **原样透传**（`success: true`，计数为 0），不报错。
+**无硬编码版本清单**：`src/mapping/download.rs::is_version_supported` 运行时判断——嵌入式映射表含该版本，或外部映射目录存在 `<version>.tiny.gz`，即可反混淆。都不存在 → **原样透传**（`success: true`，计数为 0），不报错。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。
 
 ### 映射嵌入二进制（单文件部署）
 - `build.rs` 编译期扫描 `mappings/<version>.tiny.gz`，生成 `include_bytes!` 嵌入表
 - **构建前必须运行 `bash scripts/download_mappings.sh`** 下载映射文件到 `mappings/` 目录
-- 运行时加载优先级：嵌入式表 → 外部 `SPINYARN_MAPPINGS_DIR` 目录覆盖 → 都没有则透传
+- 运行时加载优先级：嵌入式表 → 外部 `SPINYARN_MAPPINGS_DIR` 目录（`config.toml` 的 `maven.mappings_dir`）覆盖 → 都没有则透传
 
 ### 配置加载
-`Config::load()` 按顺序查找：`config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则使用默认值（`127.0.0.1:14523`）。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。
+`Config::load()` 按顺序查找：`config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则使用默认值（`127.0.0.1:14523`）。配置项：`server.host`/`server.port`/`server.max_body_size`（默认 64MB）/`server.max_concurrency`（默认 32）/`maven.mappings_dir`（默认 `./mappings`）；后三项未配置时分别由 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 环境变量兜底。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。
 
 ### 版本格式兼容
 `src/mapping/tiny_v2.rs` 自动检测 v1（平铺 `CLASS`/`FIELD`/`METHOD`）和 v2（缩进 `c`/`\tf`/`\tm`）格式，列位置按头部命名空间名定位（兼容 1.14 特殊列序）。

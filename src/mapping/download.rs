@@ -21,6 +21,15 @@ fn bundled_path(mappings_dir: &str, version: &str) -> PathBuf {
     Path::new(mappings_dir).join(format!("{}.tiny.gz", version))
 }
 
+/// Whether a mapping is available for a version, either from the embedded
+/// table or from an external `<mappings_dir>/<version>.tiny.gz` file.
+///
+/// Drives the passthrough decision; avoids the cost of the concurrency gate
+/// for versions we cannot deobfuscate anyway.
+pub fn is_version_supported(version: &str, mappings_dir: &str) -> bool {
+    embedded::get(version).is_some() || bundled_path(mappings_dir, version).exists()
+}
+
 /// Load mappings for a version.
 ///
 /// Priority:
@@ -28,13 +37,12 @@ fn bundled_path(mappings_dir: &str, version: &str) -> PathBuf {
 /// 2. External `mappings/` directory override (if it contains the version).
 ///
 /// Returns `Ok(None)` when no source provides the version.
-pub fn load_mappings(version: &str) -> Result<Option<Mappings>, MappingLoadError> {
+pub fn load_mappings(version: &str, mappings_dir: &str) -> Result<Option<Mappings>, MappingLoadError> {
     if let Some(bytes) = embedded::get(version) {
         return parse_gz(bytes).map(Some);
     }
 
-    let dir = std::env::var("SPINYARN_MAPPINGS_DIR").unwrap_or_else(|_| "./mappings".to_string());
-    let path = bundled_path(&dir, version);
+    let path = bundled_path(mappings_dir, version);
     if path.exists() {
         let bytes = std::fs::read(&path)?;
         return parse_gz(&bytes).map(Some);

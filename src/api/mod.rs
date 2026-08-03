@@ -1,5 +1,7 @@
 use axum::{extract::DefaultBodyLimit, response::Response, Router};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Semaphore;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -11,6 +13,14 @@ use crate::config::Config;
 mod deobfuscate;
 mod health;
 mod response;
+
+/// Router-wide state: the deobfuscation concurrency gate and the external
+/// mappings directory (both driven by `config.toml`).
+#[derive(Clone)]
+pub struct AppState {
+    pub gate: Arc<Semaphore>,
+    pub mappings_dir: String,
+}
 
 fn make_info_span(request: &axum::extract::Request) -> Span {
     info_span!(
@@ -49,7 +59,7 @@ fn on_response_debug(response: &Response, latency: Duration, span: &Span) {
     );
 }
 
-pub fn build_router(_config: Config) -> Router {
+pub fn build_router(config: Config) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -62,14 +72,16 @@ pub fn build_router(_config: Config) -> Router {
         .make_span_with(make_debug_span)
         .on_response(on_response_debug);
 
-    let deobfuscate_route: axum::routing::MethodRouter = axum::routing::post(deobfuscate::handler)
-        .layer(DefaultBodyLimit::max(64 * 1024 * 1024));
-    let deobfuscate_route: axum::routing::MethodRouter = deobfuscate_route.layer(info_trace.clone());
+    let deobfuscate_route: axum::routing::MethodRouter<AppState> =
+        axum::routing::post(deobfuscate::handler)
+            .layer(DefaultBodyLimit::max(config.server.max_body_size));
+    let deobfuscate_route: axum::routing::MethodRouter<AppState> =
+        deobfuscate_route.layer(info_trace.clone());
 
-    let deobfuscate_plain_route: axum::routing::MethodRouter =
+    let deobfuscate_plain_route: axum::routing::MethodRouter<AppState> =
         axum::routing::post(deobfuscate::handler_plain)
-            .layer(DefaultBodyLimit::max(64 * 1024 * 1024));
-    let deobfuscate_plain_route: axum::routing::MethodRouter =
+            .layer(DefaultBodyLimit::max(config.server.max_body_size));
+    let deobfuscate_plain_route: axum::routing::MethodRouter<AppState> =
         deobfuscate_plain_route.layer(info_trace.clone());
 
     let api_routes = Router::new()
@@ -78,7 +90,10 @@ pub fn build_router(_config: Config) -> Router {
         .route(
             "/api/v1/health",
             axum::routing::get(health::handler).layer(debug_trace),
-        );
-
+        )
+        .with_state(AppState {
+            gate: Arc::new(Semaphore::new(config.server.max_concurrency)),
+            mappings_dir: config.maven.mappings_dir,
+        });
     Router::new().merge(api_routes).layer(cors)
 }

@@ -18,11 +18,7 @@ async fn main() {
     START_TIME.store(start_ts, Ordering::Relaxed);
 
     let config = Config::load();
-    std::env::set_var("SPINYARN_MAPPINGS_DIR", &config.maven.mappings_dir);
-    tracing::info!(
-        "Bundled mappings dir: {}",
-        config.maven.mappings_dir
-    );
+    tracing::info!("Bundled mappings dir: {}", config.maven.mappings_dir);
     let app = build_router(config.clone());
 
     // Bind with port-auto-increment: if the configured/default port is taken,

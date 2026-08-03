@@ -1,32 +1,8 @@
-use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::collections::HashSet;
 use std::path::Path;
 
-/// Built-in supported versions (for reference). Versions outside this set are
-/// passed through unchanged rather than being deobfuscated.
-pub static SUPPORTED_VERSIONS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    [
-        // 1.14 (5)
-        "1.14", "1.14.1", "1.14.2", "1.14.3", "1.14.4",
-        // 1.15 (3)
-        "1.15", "1.15.1", "1.15.2",
-        // 1.16 (6)
-        "1.16", "1.16.1", "1.16.2", "1.16.3", "1.16.4", "1.16.5",
-        // 1.17 (2)
-        "1.17", "1.17.1",
-        // 1.18 (3)
-        "1.18", "1.18.1", "1.18.2",
-        // 1.19 (5)
-        "1.19", "1.19.1", "1.19.2", "1.19.3", "1.19.4",
-        // 1.20 (7)
-        "1.20", "1.20.1", "1.20.2", "1.20.3", "1.20.4", "1.20.5", "1.20.6",
-        // 1.21 (12)
-        "1.21", "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5",
-        "1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11",
-    ]
-    .into()
-});
+/// Default request body limit (64MB).
+pub const DEFAULT_MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct Config {
@@ -42,6 +18,10 @@ pub struct ServerConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+    #[serde(default = "default_max_body_size")]
+    pub max_body_size: usize,
+    #[serde(default = "default_max_concurrency")]
+    pub max_concurrency: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -56,8 +36,19 @@ fn default_host() -> String {
 fn default_port() -> u16 {
     14523
 }
+fn default_max_body_size() -> usize {
+    DEFAULT_MAX_BODY_SIZE
+}
+/// Concurrency default falls back to `SPINYARN_MAX_CONCURRENCY`, then 32.
+fn default_max_concurrency() -> usize {
+    std::env::var("SPINYARN_MAX_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(32)
+}
+/// Mappings dir falls back to `SPINYARN_MAPPINGS_DIR`, then `./mappings`.
 fn default_mappings_dir() -> String {
-    "./mappings".to_string()
+    std::env::var("SPINYARN_MAPPINGS_DIR").unwrap_or_else(|_| "./mappings".to_string())
 }
 
 impl Default for ServerConfig {
@@ -65,6 +56,8 @@ impl Default for ServerConfig {
         Self {
             host: default_host(),
             port: default_port(),
+            max_body_size: default_max_body_size(),
+            max_concurrency: default_max_concurrency(),
         }
     }
 }
