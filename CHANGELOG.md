@@ -6,6 +6,17 @@
 
 ### 新增
 - 反混淆路径并发限流（`src/api/deobfuscate.rs::GATE`，`SPINYARN_MAX_CONCURRENCY` 可调，默认 32）：无缓存模型下每个在途请求持有 ~30MB 版本表，限流将峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
+- HTTP 访问日志中间件（`tower_http::TraceLayer`）：记录 method/uri/status/耗时；deobfuscate 走 INFO，health 探针走 DEBUG 降噪
+- 默认端口改为 14523，端口被占用时自动 +1 递增直至找到空闲端口
+- `POST /api/v1/deobfuscate/plain` 纯文本端点：成功返回 `text/plain` 完整反混淆日志，免 JSON 转义；失败仍返回 JSON 错误
+- **嵌套类裸键反向索引**（`Mappings::nested`）：缺外层的裸嵌套键（`class_7512` → `DimensionType$MonsterSettings`）可反混淆，仅对全局唯一内层键建立，重复键跳过防歧义
+
+### 变更
+- **breaking change**：`/api/v1/deobfuscate` 响应移除 `original` 字段（客户端持有原文），仅返回 `deobfuscated` + `stats`
+- 引擎性能优化：非堆栈行进正则前先 `contains` 快速过滤，无混淆键的行零成本直通，真实 5MB 日志引擎耗时 ~95ms → ~30ms
+
+### 文档
+- `docs/yarn_unmapped_stats.csv`：43 版本 Yarn 未命名键统计（METHOD 34.2% / FIELD 33.2% / CLASS 0.5%），按方法未命名率降序排列
 
 ## [v0.3.0] - 2026-07-31
 

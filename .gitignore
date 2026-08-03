@@ -1,6 +1,9 @@
 # Rust build artifacts
 /target
 
+# Copied binary (single-file deployment convenience)
+/spinyarn
+
 # Logs & temp
 *.log
 *.log.txt
