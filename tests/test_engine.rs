@@ -76,14 +76,23 @@ fn test_nested_class_full_key() {
 }
 
 #[test]
-fn test_source_file_name_remap() {
-    let engine = engine_from_fixture("tests/fixtures/test-mappings-v1.tiny");
-    let r = engine.deobfuscate("at net.minecraft.class_1297.method_6004(class_1297.java:10)");
+fn test_stack_line_module_prefix_readable_class() {
+    // Class name already readable (not in class_ table) but method maps:
+    // the `knot//` module prefix must be stripped, matching Sherlock.
+    let input = b"v1\tofficial\tintermediary\tnamed\n\
+                  CLASS\ta\tnet/minecraft/class_310\tnet/minecraft/client/MinecraftClient\n\
+                  METHOD\ta\t()V\trun\tmethod_1806\trun\n";
+    let m = parse(input).unwrap();
+    let engine = LineEngine::new(m);
+    let r = engine.deobfuscate("at knot//net.minecraft.server.MinecraftServer.method_1806(MinecraftServer.java:1755)");
     assert!(
-        r.text.contains("(Entity.java:10)"),
+        r.text.contains("at net.minecraft.server.MinecraftServer.run(MinecraftServer.java:1755)"),
         "got: {}",
         r.text
     );
+    // dotted module prefixes (java.base/) must stay intact on unmapped lines
+    let r2 = engine.deobfuscate("at java.base/java.lang.Thread.run(Thread.java:1583)");
+    assert_eq!(r2.text, "at java.base/java.lang.Thread.run(Thread.java:1583)");
 }
 
 #[test]

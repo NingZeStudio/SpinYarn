@@ -26,6 +26,24 @@ pub struct LineEngine {
     nested: HashMap<String, String>,
 }
 
+fn strip_module_prefix(class_part: &str) -> &str {
+    // Mirrors Sherlock's `(?:\w+\/+)?` module prefix: word chars followed by
+    // one or more slashes (`knot//`, `knot/`). A dot breaks it, so paths like
+    // `java.base/java.util...` keep their prefix intact.
+    let bytes = class_part.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+        i += 1;
+    }
+    if i > 0 && i < bytes.len() && bytes[i] == b'/' {
+        while i < bytes.len() && bytes[i] == b'/' {
+            i += 1;
+        }
+        return &class_part[i..];
+    }
+    class_part
+}
+
 impl LineEngine {
     pub fn new(mappings: Mappings) -> Self {
         Self {
@@ -128,6 +146,13 @@ impl LineEngine {
 
         if !class_hit && !method_hit {
             return None;
+        }
+
+        // Class name not mapped (usually already readable) but a method was:
+        // drop any module prefix like `knot//`/`knot/` so the rebuilt line
+        // matches the mapping-agnostic class path (Sherlock behaviour).
+        if !class_hit {
+            new_class_part = strip_module_prefix(class_part).to_string();
         }
 
         let new_paren = self.replace_file_name(paren);
