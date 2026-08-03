@@ -54,7 +54,7 @@ fn default_host() -> String {
     "127.0.0.1".to_string()
 }
 fn default_port() -> u16 {
-    8080
+    14523
 }
 fn default_mappings_dir() -> String {
     "./mappings".to_string()

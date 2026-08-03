@@ -25,9 +25,27 @@ async fn main() {
     );
     let app = build_router(config.clone());
 
-    let addr = std::net::SocketAddr::new(config.server.host.parse().unwrap(), config.server.port);
+    // Bind with port-auto-increment: if the configured/default port is taken,
+    // try the next one until a free port is found.
+    let host = config.server.host.clone();
+    let mut port = config.server.port;
+    let (listener, addr) = loop {
+        let addr = std::net::SocketAddr::new(
+            host.parse().unwrap_or_else(|_| panic!("invalid host: {}", host)),
+            port,
+        );
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(listener) => break (listener, addr),
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                tracing::warn!("port {} in use, falling back to {}", port, port + 1);
+                port = port
+                    .checked_add(1)
+                    .expect("no free port in the whole range");
+            }
+            Err(e) => panic!("failed to bind {}: {}", addr, e),
+        }
+    };
     tracing::info!("SpinYarn listening on {}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
