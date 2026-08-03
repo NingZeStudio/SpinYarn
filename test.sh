@@ -19,6 +19,15 @@ trap cleanup EXIT
 start_server() {
     echo "[*] Starting SpinYarn on ${SPINYARN_HOST}:${SPINYARN_PORT} ..."
     rm -f "$TEST_LOG"
+
+    # Mappings ship next to the binary, not embedded. Copy them there if missing.
+    local bin_dir
+    bin_dir="$(dirname "$SPINYARN_BIN")"
+    if [[ -d "mappings" && ! -d "$bin_dir/mappings" ]]; then
+        echo "[*] Copying mappings/ to $bin_dir/mappings"
+        cp -r mappings "$bin_dir/"
+    fi
+
     SPINYARN_PID=$(RUST_LOG=error "$SPINYARN_BIN" > "$TEST_LOG" 2>&1 & echo $!)
 
     for i in {1..40}; do

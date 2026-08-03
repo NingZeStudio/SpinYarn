@@ -73,6 +73,8 @@ jobs:
             cp "target/${{ matrix.target }}/release/spinyarn" "dist/spinyarn-${{ matrix.name }}"
           fi
           chmod +x "dist/spinyarn-${{ matrix.name }}"* 2>/dev/null || true
+          # Mappings ship alongside the binary (not embedded).
+          cp -r mappings "dist/mappings"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

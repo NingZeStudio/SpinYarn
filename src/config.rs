@@ -1,8 +1,18 @@
 use serde::Deserialize;
-use std::path::Path;
+use std::path::PathBuf;
 
 /// Default request body limit (64MB).
 pub const DEFAULT_MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
+
+/// Directory containing the running executable. Default locations for the
+/// config file and the external mappings dir are resolved relative to it,
+/// so the binary can be run from anywhere with its mappings/ next to it.
+fn exe_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
 
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct Config {
@@ -46,9 +56,12 @@ fn default_max_concurrency() -> usize {
         .and_then(|v| v.parse().ok())
         .unwrap_or(32)
 }
-/// Mappings dir falls back to `SPINYARN_MAPPINGS_DIR`, then `./mappings`.
+/// Mappings dir default: `SPINYARN_MAPPINGS_DIR` override, else
+/// `<exe_dir>/mappings` (shipped alongside the binary).
 fn default_mappings_dir() -> String {
-    std::env::var("SPINYARN_MAPPINGS_DIR").unwrap_or_else(|_| "./mappings".to_string())
+    std::env::var("SPINYARN_MAPPINGS_DIR")
+        .ok()
+        .unwrap_or_else(|| exe_dir().join("mappings").to_string_lossy().into_owned())
 }
 
 impl Default for ServerConfig {
@@ -72,22 +85,27 @@ impl Default for MavenConfig {
 
 impl Config {
     pub fn load() -> Self {
-        let config_paths = ["config.toml", "SpinYarn.toml", "/etc/spinyarn/config.toml"];
+        let config_paths = [
+            exe_dir().join("config.toml"),
+            PathBuf::from("config.toml"),
+            PathBuf::from("SpinYarn.toml"),
+            PathBuf::from("/etc/spinyarn/config.toml"),
+        ];
 
         for path in &config_paths {
-            if Path::new(path).exists() {
+            if path.exists() {
                 match std::fs::read_to_string(path) {
                     Ok(content) => match toml::from_str(&content) {
                         Ok(config) => {
-                            tracing::info!("Loaded config from {}", path);
+                            tracing::info!("Loaded config from {}", path.display());
                             return config;
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to parse {}: {}", path, e);
+                            tracing::warn!("Failed to parse {}: {}", path.display(), e);
                         }
                     },
                     Err(e) => {
-                        tracing::warn!("Failed to read {}: {}", path, e);
+                        tracing::warn!("Failed to read {}: {}", path.display(), e);
                     }
                 }
             }
