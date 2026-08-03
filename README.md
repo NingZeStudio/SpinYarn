@@ -8,7 +8,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，内存恒定 ~30-40MB，不随请求版本数增长
 - **并发限流**：`SPINYARN_MAX_CONCURRENCY`（默认 32）信号量把峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
 - **高性能**：手写 memchr 堆栈解析 + 预编译正则兜底（带 memchr 快速过滤，无键行零成本直通），真实 5MB 日志引擎处理 ~30ms
-- **Sherlock 兼容处理**：`knot/`、`knot//` 模块前缀、嵌套类、源文件名、描述符、`(Native Method)`/`(Unknown Source)` 全覆盖
+- **模块前缀处理**：`knot/`、`knot//` 模块前缀、嵌套类、源文件名、描述符、`(Native Method)`/`(Unknown Source)` 全覆盖
 - **嵌套类裸键**：`class_7512` 这类缺外层的嵌套键通过反向索引解析为 `DimensionType$MonsterSettings`
 - **透传机制**：不支持的版本原样返回，不报错
 - **纯文本输出**：`/api/v1/deobfuscate/plain` 直接返回 `text/plain` 完整反混淆日志，免 JSON 转义

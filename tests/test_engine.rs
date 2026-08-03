@@ -78,7 +78,7 @@ fn test_nested_class_full_key() {
 #[test]
 fn test_stack_line_module_prefix_readable_class() {
     // Class name already readable (not in class_ table) but method maps:
-    // the `knot//` module prefix must be stripped, matching Sherlock.
+    // the `knot//` module prefix must be stripped for readable output.
     let input = b"v1\tofficial\tintermediary\tnamed\n\
                   CLASS\ta\tnet/minecraft/class_310\tnet/minecraft/client/MinecraftClient\n\
                   METHOD\ta\t()V\trun\tmethod_1806\trun\n";

@@ -14,7 +14,7 @@ pub struct DeobfuscateResult {
 
 /// High-performance per-version deobfuscation engine.
 ///
-/// Strategy (mirrors Aternos Sherlock's structure, tuned for Rust):
+/// Strategy:
 /// - Stack lines are parsed by hand (memchr-based) and remapped structurally.
 /// - Non-stack lines fall back to a single precompiled regex pass.
 /// - Lookup tables are global (`method_XXXX` / `field_XXXX` are globally unique).
@@ -27,9 +27,9 @@ pub struct LineEngine {
 }
 
 fn strip_module_prefix(class_part: &str) -> &str {
-    // Mirrors Sherlock's `(?:\w+\/+)?` module prefix: word chars followed by
-    // one or more slashes (`knot//`, `knot/`). A dot breaks it, so paths like
-    // `java.base/java.util...` keep their prefix intact.
+    // Word chars followed by one or more slashes form a module prefix
+    // (`knot//`, `knot/`). A dot breaks it, so paths like `java.base/...`
+    // keep their prefix intact.
     let bytes = class_part.as_bytes();
     let mut i = 0;
     while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
@@ -150,7 +150,7 @@ impl LineEngine {
 
         // Class name not mapped (usually already readable) but a method was:
         // drop any module prefix like `knot//`/`knot/` so the rebuilt line
-        // matches the mapping-agnostic class path (Sherlock behaviour).
+        // uses the plain class path.
         if !class_hit {
             new_class_part = strip_module_prefix(class_part).to_string();
         }
@@ -173,7 +173,6 @@ impl LineEngine {
 
     /// Remap an obfuscated class name inside the `(file:line)` part of a stack
     /// line, e.g. `class_310.java:465` -> `MinecraftClient.java:465`.
-    /// Mirrors Sherlock's source-file handling.
     fn replace_file_name(&self, paren: &str) -> String {
         let (file, line) = match paren.rfind(':') {
             Some(i) => (&paren[..i], &paren[i..]),
