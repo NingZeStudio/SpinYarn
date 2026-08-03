@@ -20,6 +20,7 @@
 
 ### 测试
 - 真实日志快照回归（`tests/snapshot_test.rs`）：对 `1.21.9-crash.log`、`1.21.11-fcl.log.txt` 反混淆并与 `tests/snapshots/` 逐字节对比，防引擎行为漂移
+- 基准测试（`benches/deobfuscate.rs`，criterion）：纯堆栈/纯非堆栈/真实日志/5MB 噪声吞吐，实测真实日志 ~350µs、5MB ~23ms（快速过滤生效）
 
 ### 文档
 - `docs/yarn_unmapped_stats.csv`：43 版本 Yarn 未命名键统计（METHOD 34.2% / FIELD 33.2% / CLASS 0.5%），按方法未命名率降序排列

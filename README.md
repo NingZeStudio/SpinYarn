@@ -121,6 +121,7 @@ curl -X POST /api/v1/deobfuscate/plain \
 ```bash
 cargo test          # 19 个单元测试（解析 + 引擎 + 真实日志快照回归）
 bash test.sh        # 8 个集成场景（需先构建 release 二进制）
+cargo bench         # 基准测试（引擎吞吐：堆栈/非堆栈/真实/5MB 噪声）
 ```
 
 真实日志样本：`tests/fixtures/1.21.9-crash.log`、`tests/fixtures/1.21.11-fcl.log.txt`。
