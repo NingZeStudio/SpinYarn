@@ -23,6 +23,7 @@ pub struct LineEngine {
     classes: HashMap<String, String>,
     methods: HashMap<String, String>,
     fields: HashMap<String, String>,
+    nested: HashMap<String, String>,
 }
 
 impl LineEngine {
@@ -31,6 +32,7 @@ impl LineEngine {
             classes: mappings.classes,
             methods: mappings.methods,
             fields: mappings.fields,
+            nested: mappings.nested,
         }
     }
 
@@ -169,6 +171,7 @@ impl LineEngine {
         let Some(named) = self
             .classes
             .get(key)
+            .or_else(|| self.nested.get(key))
             .or_else(|| key.rfind('$').and_then(|d| self.classes.get(&key[..d])))
         else {
             return paren.to_string();
@@ -198,6 +201,9 @@ impl LineEngine {
         if let Some(named) = self.classes.get(key) {
             return Some(named);
         }
+        if let Some(named) = self.nested.get(key) {
+            return Some(named);
+        }
         if let Some(dollar) = key.rfind('$') {
             return self.classes.get(&key[..dollar]).map(|s| s.as_str());
         }
@@ -207,6 +213,14 @@ impl LineEngine {
     /// Residual regex pass for non-stack lines (descriptors, messages, etc.).
     /// Returns the remapped line and match counts, or `None` when nothing matched.
     fn residual_replace(&self, line: &str) -> Option<(String, usize, usize, usize)> {
+        // Fast path: the regex is only needed when the line actually carries an
+        // obfuscated key prefix. Most real log lines don't, so skip the regex
+        // engine entirely and let the caller push the line through unchanged.
+        // `contains` uses memchr-style scanning, far cheaper than a regex pass.
+        if !line.contains("class_") && !line.contains("method_") && !line.contains("field_") {
+            return None;
+        }
+
         let mut out = String::with_capacity(line.len());
         let mut last = 0usize;
         let mut changed = false;
@@ -225,7 +239,7 @@ impl LineEngine {
             let prefix = caps.name("prefix").map(|p| p.as_str()).unwrap_or("");
 
             let replacement = if key.starts_with("class_") {
-                self.classes.get(key).map(|n| {
+                self.classes.get(key).or_else(|| self.nested.get(key)).map(|n| {
                     if prefix.contains('.') {
                         n.replace('/', ".")
                     } else {

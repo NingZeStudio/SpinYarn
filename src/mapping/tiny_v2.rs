@@ -9,6 +9,12 @@ pub struct Mappings {
     pub classes: HashMap<String, String>,
     pub methods: HashMap<String, String>,
     pub fields: HashMap<String, String>,
+    /// Reverse lookup for nested-class bare keys: inner `class_XXXX` -> full
+    /// named name. Logs sometimes reference the inner key of a nested class
+    /// without its outer prefix (e.g. bare `class_7512` for
+    /// `class_2874$class_7512`). Only populated for inner keys that are
+    /// globally unique across all nested classes, to avoid ambiguity.
+    pub nested: HashMap<String, String>,
 }
 
 impl Mappings {
@@ -109,6 +115,38 @@ fn prealloc(line_count: usize) -> Mappings {
         classes: HashMap::with_capacity(line_count / 10),
         methods: HashMap::with_capacity(line_count / 2),
         fields: HashMap::with_capacity(line_count / 2),
+        nested: HashMap::new(),
+    }
+}
+
+/// Collect nested-class candidates: inner key (after the last `$`) -> full
+/// named names seen for it. Duplicate inner keys are dropped later because
+/// they are ambiguous.
+fn collect_nested(
+    m: &mut Mappings,
+    key: &str,
+    named: &str,
+    candidates: &mut HashMap<String, Vec<String>>,
+) {
+    m.classes.insert(key.to_owned(), named.to_owned());
+    if let Some(dollar) = key.rfind('$') {
+        let inner = &key[dollar + 1..];
+        if inner.starts_with("class_") {
+            candidates
+                .entry(inner.to_owned())
+                .or_default()
+                .push(named.to_owned());
+        }
+    }
+}
+
+/// Populate the `nested` reverse table from candidates, keeping only inner
+/// keys that appeared exactly once across all nested classes.
+fn finalize_nested(m: &mut Mappings, candidates: HashMap<String, Vec<String>>) {
+    for (inner, names) in candidates {
+        if names.len() == 1 {
+            m.nested.insert(inner, names.into_iter().next().unwrap());
+        }
     }
 }
 
@@ -140,6 +178,7 @@ pub fn parse(input: &[u8]) -> Result<Mappings, TinyV2ParseError> {
 fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
     let line_count = input.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
     let mut m = prealloc(line_count);
+    let mut nested_candidates: HashMap<String, Vec<String>> = HashMap::new();
     let mut lines = input.lines();
     let header = lines.next().unwrap().trim_end_matches('\r');
     let ns = NamespacePositions::parse(header)?;
@@ -162,7 +201,7 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
                 if !key.starts_with("class_") {
                     continue;
                 }
-                m.classes.insert(key.to_owned(), named.to_owned());
+                collect_nested(&mut m, key, named, &mut nested_candidates);
             }
             Some("FIELD") => {
                 let i = ns.v1_member_col(ns.intermediary);
@@ -192,6 +231,7 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
         }
     }
 
+    finalize_nested(&mut m, nested_candidates);
     Ok(m)
 }
 
@@ -202,6 +242,7 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
 fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
     let line_count = input.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
     let mut m = prealloc(line_count);
+    let mut nested_candidates: HashMap<String, Vec<String>> = HashMap::new();
     let mut ns: Option<NamespacePositions> = None;
 
     for (line_num, line) in input.lines().enumerate() {
@@ -238,7 +279,7 @@ fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
                 if !key.starts_with("class_") {
                     continue;
                 }
-                m.classes.insert(key.to_owned(), named.to_owned());
+                collect_nested(&mut m, key, named, &mut nested_candidates);
             }
             Some("f") if leading == 1 => {
                 let i = ns.v2_member_col(ns.intermediary);
@@ -268,5 +309,6 @@ fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
         }
     }
 
+    finalize_nested(&mut m, nested_candidates);
     Ok(m)
 }

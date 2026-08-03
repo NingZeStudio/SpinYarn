@@ -113,3 +113,36 @@ fn test_empty_input() {
     let engine = engine_from_fixture("tests/fixtures/test-mappings-v1.tiny");
     assert_eq!(engine.deobfuscate("").text, "");
 }
+
+#[test]
+fn test_bare_nested_class_reverse_lookup() {
+    // A log line referencing only the inner key of a nested class
+    // (`class_7512` for `class_2874$class_7512`) must still resolve via the
+    // reverse `nested` table when the inner key is globally unique.
+    let input = b"v1\tofficial\tintermediary\tnamed\n\
+                  CLASS\ta\tnet/minecraft/class_2874\tnet/minecraft/world/dimension/DimensionType\n\
+                  CLASS\ta$b\tnet/minecraft/class_2874$class_7512\tnet/minecraft/world/dimension/DimensionType$MonsterSettings\n";
+    let m = parse(input).unwrap();
+    let engine = LineEngine::new(m);
+
+    let r = engine.deobfuscate("monsterSettings=class_7512[piglinSafe=false]");
+    assert!(
+        r.text.contains("DimensionType$MonsterSettings"),
+        "got: {}",
+        r.text
+    );
+}
+
+#[test]
+fn test_bare_nested_class_ambiguous_skipped() {
+    // When an inner key appears under multiple outer classes it is ambiguous
+    // and must NOT populate the reverse table.
+    let input = b"v1\tofficial\tintermediary\tnamed\n\
+                  CLASS\ta\tnet/minecraft/class_2874$class_7512\tnet/minecraft/A$MonsterSettings\n\
+                  CLASS\tb\tnet/minecraft/class_9999$class_7512\tnet/minecraft/B$Other\n";
+    let m = parse(input).unwrap();
+    let engine = LineEngine::new(m);
+
+    let r = engine.deobfuscate("monsterSettings=class_7512[piglinSafe=false]");
+    assert!(!r.text.contains("MonsterSettings"), "got: {}", r.text);
+}
