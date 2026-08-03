@@ -3,7 +3,7 @@ set -euo pipefail
 
 SPINYARN_BIN="${SPINYARN_BIN:-./target/release/spinyarn}"
 SPINYARN_HOST="${SPINYARN_HOST:-127.0.0.1}"
-SPINYARN_PORT="${SPINYARN_PORT:-8080}"
+SPINYARN_PORT="${SPINYARN_PORT:-14523}"
 BASE_URL="http://${SPINYARN_HOST}:${SPINYARN_PORT}"
 TEST_LOG="$(pwd)/spinyarn-test.log"
 
@@ -133,10 +133,33 @@ test_deobfuscate_unsupported() {
         -d '{"content": "at net.minecraft.class_7833", "version": "1.13.2"}')
 
     assert_equals "passthrough.success == true" "$(echo "$resp" | jq -r .success)" "true"
-    assert_equals "deobfuscated == original" \
+    assert_equals "deobfuscated == input" \
         "$(echo "$resp" | jq -r .data.deobfuscated)" "at net.minecraft.class_7833"
     assert_equals "classes_mapped == 0" \
         "$(echo "$resp" | jq -r .data.stats.classes_mapped)" "0"
+}
+
+test_deobfuscate_plain() {
+    echo ""
+    echo "=== Test: Deobfuscate Plain Text ==="
+    local ctype
+    ctype=$(curl -s -o /dev/null -w "%{content_type}" \
+        -X POST "${BASE_URL}/api/v1/deobfuscate/plain" \
+        -H "Content-Type: application/json" \
+        -d '{"content": "at net.minecraft.class_7833.method_46349(Test.java:1)", "version": "1.21.4"}')
+    assert_equals "content-type == text/plain" "$ctype" "text/plain; charset=utf-8"
+
+    local body
+    body=$(curl -sf -X POST "${BASE_URL}/api/v1/deobfuscate/plain" \
+        -H "Content-Type: application/json" \
+        -d '{"content": "at net.minecraft.class_7833.method_46349(Test.java:1)", "version": "1.21.4"}')
+    assert_contains "plain class mapped" "$body" "net.minecraft.util.math.RotationAxis"
+
+    local passthrough
+    passthrough=$(curl -sf -X POST "${BASE_URL}/api/v1/deobfuscate/plain" \
+        -H "Content-Type: application/json" \
+        -d '{"content": "at net.minecraft.class_7833", "version": "1.13.2"}')
+    assert_equals "plain passthrough == input" "$passthrough" "at net.minecraft.class_7833"
 }
 
 test_invalid_request() {
@@ -176,6 +199,7 @@ main() {
     test_deobfuscate_descriptor
     test_deobfuscate_multi_line
     test_deobfuscate_unsupported
+    test_deobfuscate_plain
     test_invalid_request
 
     echo ""

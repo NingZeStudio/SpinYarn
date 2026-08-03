@@ -1,4 +1,8 @@
-use axum::Json;
+use axum::{
+    http::{header, HeaderMap, HeaderValue},
+    response::{IntoResponse, Response},
+    Json,
+};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tokio::sync::Semaphore;
@@ -36,7 +40,6 @@ pub struct DeobfuscateRequest {
 
 #[derive(serde::Serialize)]
 pub struct DeobfuscateResponse {
-    pub original: String,
     pub deobfuscated: String,
     pub stats: DeobfuscateStats,
 }
@@ -50,26 +53,29 @@ pub struct DeobfuscateStats {
     pub total_time_ms: f64,
 }
 
-fn passthrough(req: DeobfuscateRequest) -> DeobfuscateResponse {
-    DeobfuscateResponse {
-        original: req.content.clone(),
-        deobfuscated: req.content,
-        stats: DeobfuscateStats {
-            version: req.version,
-            classes_mapped: 0,
-            methods_mapped: 0,
-            fields_mapped: 0,
-            total_time_ms: 0.0,
-        },
+struct DeobfuscateOutcome {
+    text: String,
+    stats: DeobfuscateStats,
+}
+
+fn passthrough_stats(version: String) -> DeobfuscateStats {
+    DeobfuscateStats {
+        version,
+        classes_mapped: 0,
+        methods_mapped: 0,
+        fields_mapped: 0,
+        total_time_ms: 0.0,
     }
 }
 
-#[axum::debug_handler]
-pub async fn handler(
-    Json(req): Json<DeobfuscateRequest>,
-) -> Result<Json<crate::api::response::ApiResponse<DeobfuscateResponse>>, ApiError> {
+/// Shared pipeline for both JSON and plain-text handlers:
+/// passthrough check -> concurrency gate -> load mappings -> deobfuscate.
+async fn process(req: DeobfuscateRequest) -> Result<DeobfuscateOutcome, ApiError> {
     if !crate::config::SUPPORTED_VERSIONS.contains(req.version.as_str()) {
-        return Ok(Json(crate::api::response::ApiResponse::success(passthrough(req))));
+        return Ok(DeobfuscateOutcome {
+            text: req.content,
+            stats: passthrough_stats(req.version),
+        });
     }
 
     // Bound peak memory: at most N in-flight mapping table sets.
@@ -79,6 +85,7 @@ pub async fn handler(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let version = req.version.clone();
+    let content = req.content;
 
     // CPU-bound: gzip decompress + parse.
     let loaded: Result<Option<Mappings>, ApiError> = tokio::task::spawn_blocking(move || {
@@ -91,12 +98,14 @@ pub async fn handler(
         Ok(Some(m)) => m,
         Ok(None) => {
             // Version declared supported but no mapping available -> pass through.
-            return Ok(Json(crate::api::response::ApiResponse::success(passthrough(req))));
+            return Ok(DeobfuscateOutcome {
+                text: content,
+                stats: passthrough_stats(req.version),
+            });
         }
         Err(e) => return Err(e),
     };
 
-    let content = req.content.clone();
     let deobfuscated = tokio::task::spawn_blocking(move || {
         let engine = LineEngine::new(mappings);
         engine.deobfuscate(&content)
@@ -104,17 +113,40 @@ pub async fn handler(
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
+    Ok(DeobfuscateOutcome {
+        text: deobfuscated.text,
+        stats: DeobfuscateStats {
+            version: req.version,
+            classes_mapped: deobfuscated.classes_mapped,
+            methods_mapped: deobfuscated.methods_mapped,
+            fields_mapped: deobfuscated.fields_mapped,
+            total_time_ms: deobfuscated.total_time_ms,
+        },
+    })
+}
+
+#[axum::debug_handler]
+pub async fn handler(
+    Json(req): Json<DeobfuscateRequest>,
+) -> Result<Json<crate::api::response::ApiResponse<DeobfuscateResponse>>, ApiError> {
+    let outcome = process(req).await?;
     Ok(Json(crate::api::response::ApiResponse::success(
         DeobfuscateResponse {
-            original: req.content,
-            deobfuscated: deobfuscated.text,
-            stats: DeobfuscateStats {
-                version: req.version,
-                classes_mapped: deobfuscated.classes_mapped,
-                methods_mapped: deobfuscated.methods_mapped,
-                fields_mapped: deobfuscated.fields_mapped,
-                total_time_ms: deobfuscated.total_time_ms,
-            },
+            deobfuscated: outcome.text,
+            stats: outcome.stats,
         },
     )))
+}
+
+#[axum::debug_handler]
+pub async fn handler_plain(
+    Json(req): Json<DeobfuscateRequest>,
+) -> Result<Response, ApiError> {
+    let outcome = process(req).await?;
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    Ok((headers, outcome.text).into_response())
 }
