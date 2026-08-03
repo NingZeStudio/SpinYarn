@@ -16,6 +16,7 @@
 - 引擎性能优化：非堆栈行进正则前先 `contains` 快速过滤，无混淆键的行零成本直通，真实 5MB 日志引擎耗时 ~95ms → ~30ms
 - **版本动态推断**：删除 `SUPPORTED_VERSIONS` 硬编码清单，运行时按嵌入式表 / 外部映射目录判断，往 `mappings/` 新增版本文件（含 pre-release）自动生效
 - **配置统一**：`server.max_body_size`（默认 64MB）/`server.max_concurrency`（默认 32）纳入 `config.toml`，环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 作兜底；并发信号量由静态 `GATE` 改为 `AppState` 注入
+- **映射外置**：移除 `build.rs`/`embedded.rs`，映射不再嵌入二进制（二进制 43MB → ~6MB），默认从二进制同级 `./mappings/` 加载；`config.toml` 优先从二进制同级目录查找
 
 ### 文档
 - `docs/yarn_unmapped_stats.csv`：43 版本 Yarn 未命名键统计（METHOD 34.2% / FIELD 33.2% / CLASS 0.5%），按方法未命名率降序排列

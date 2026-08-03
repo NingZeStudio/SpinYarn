@@ -4,7 +4,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 
 ## 特性
 
-- **单文件部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射**编译期嵌入二进制**（~41MB），部署只需拷贝一个可执行文件
+- **映射外置部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射放在**二进制同级 `./mappings/`** 目录（不嵌入二进制，~6MB），部署时把二者放同一目录即可
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，内存恒定 ~30-40MB，不随请求版本数增长
 - **并发限流**：`server.max_concurrency`（默认 32）信号量把峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
 - **高性能**：手写 memchr 堆栈解析 + 预编译正则兜底（带 memchr 快速过滤，无键行零成本直通），真实 5MB 日志引擎处理 ~30ms
@@ -18,19 +18,23 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 ### 构建
 
 ```bash
-# 1. 下载映射表（build.rs 嵌入依赖，约 36MB）
+# 1. 下载映射表到 mappings/（部署时随二进制携带）
 bash scripts/download_mappings.sh
 
-# 2. 编译（嵌入 43 个版本映射，链接较慢，约 2-5 分钟）
+# 2. 编译（~6MB 二进制）
 cargo build --release
 ```
 
-### 运行
+### 部署与运行
 
 ```bash
+# 把映射放到二进制同级目录，二者一起部署
+cp -r mappings target/release/
 ./target/release/spinyarn
 # 默认监听 127.0.0.1:14523；端口被占用时自动 +1 递增直至找到空闲端口
 ```
+
+映射目录默认 = **二进制同级 `./mappings/`**（基于可执行文件路径定位，不依赖工作目录），可用 `maven.mappings_dir` 或 `SPINYARN_MAPPINGS_DIR` 覆盖。配置文件 `config.toml` 同样优先从二进制同级目录查找。
 
 配置可通过 `config.toml`（`server.host`/`server.port`/`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir`）配置；`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir` 未配置时分别由环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 兜底。
 
