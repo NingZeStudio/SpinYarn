@@ -90,13 +90,13 @@ fn default_cache_enabled() -> bool {
     true
 }
 fn default_cache_max_entries() -> usize {
-    32
+    44
 }
 fn default_cache_high() -> usize {
-    30
+    40
 }
 fn default_cache_low() -> usize {
-    20
+    30
 }
 
 impl Default for CacheConfig {

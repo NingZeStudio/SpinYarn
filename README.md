@@ -6,7 +6,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 
 - **映射外置部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射放在**二进制同级 `./mappings/`** 目录（不嵌入二进制，~6MB），部署时把二者放同一目录即可
 - **自动下载**：请求的 `1.x` 版本不在本地时自动从 Fabric Maven 下载映射（落盘缓存 7 天），新版本/预发布无需改代码
-- **LRU 热门缓存**：`[cache]` 段启用有界 LRU（默认 32 条目 + 水位线 30/20），热版本命中跳过加载（~6ms）；实测 20 条目 ~189MB、峰值 30 条目 ~300MB；命中/驱逐/条目数经 `/health` 暴露
+- **LRU 热门缓存**：`[cache]` 段启用有界 LRU（默认 44 条目 + 水位线 40/30，共享缓存池），热版本命中跳过加载（~6ms）；实测水位 30~40 条目 ≈ 300~400MB；命中/驱逐/条目数经 `/health` 暴露
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，单版本解析表 ~10MB，不随请求版本数增长
 - **并发限流**：`server.max_concurrency`（默认 32）信号量把峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
 - **高性能**：手写 memchr 堆栈解析 + 预编译正则兜底（带 memchr 快速过滤，无键行零成本直通），真实 5MB 日志引擎处理 ~30ms
@@ -53,9 +53,9 @@ auto_download = true       # 缺失版本自动从 Fabric Maven 下载
 
 [cache]
 enabled = true             # 有界 LRU 缓存
-max_entries = 32           # 条目上限
-high_watermark = 30        # 触发批量淘汰
-low_watermark = 20         # 淘汰到该水位
+max_entries = 44           # 条目上限
+high_watermark = 40        # 触发批量淘汰
+low_watermark = 30         # 淘汰到该水位
 ```
 
 ## API
