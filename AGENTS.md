@@ -4,9 +4,9 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 
 ## 架构要点
 
-- **无缓存模型**：每请求按 version 独立加载映射 → 反混淆 → 释放，内存恒定 ~30MB
+- **无缓存模型（基础）+ LRU 缓存（实验性）**：无缓存时每请求独立加载映射 → 反混淆 → 释放（内存恒定 ~30MB/请求）。`[cache]` 段启用**有界 LRU**（`src/cache.rs`，默认 `max_entries=10`/高水位 8/低水位 4）：解析后表以 `Arc<Mappings>` 缓存，高水位触发批量淘汰至低水位，缓存大小在低~高水位间波动（避免长期满载）；命中请求跳过加载（热请求 ~6ms）且不占并发信号量。实验目的：验证长尾流量下 LRU 是否被"烫成全量"，观测指标（命中/驱逐/条目数）经 `/health` 暴露
 - **并发限流**：`src/api/mod.rs::AppState` 的 `Semaphore`，默认 32（`config.toml` 的 `server.max_concurrency` 可调，未配置时 `SPINYARN_MAX_CONCURRENCY` 环境变量兜底）。无缓存模型下每并发请求持有一整套版本表（~30MB），限流把峰值内存钉在 N×30MB，突发流量 OOM 换成短暂排队（稳态并发约 16，平时不触发）
-- **缓存决策**：LogShare 流量为长尾分布（版本跨度大、无稳定热点），LRU 缓存会被烫成全量缓存（43 版本 × ~30MB ≈ 1.3GB+），已否决。短 TTL 缓存（按 version 缓存 60s + 条目上限）为备选方案，**待收尾实装后按线上表现评估**，在此之前维持无缓存；若未来服务器升级至能承受全量缓存的内存当量，直接上全量缓存亦可
+- **自动下载**：`maven.auto_download`（默认 true）时，请求版本不在本地且为 `1.x` 系（含 `-pre`/`-rc`，快照 `25wxx` 与 26.x 排除）→ 从 Fabric Maven 自动下载映射落盘（TTL 7 天，过期重下载失败回退旧文件），无需改代码即支持新版本
 - CPU 密集操作（gzip 解压 + 解析 + 反混淆）放入 `tokio::task::spawn_blocking`，不阻塞 runtime
 - **访问日志中间件**：`tower_http::TraceLayer` 记录每个请求的 method/uri/status/耗时。deobfuscate 走 INFO，health 探针走 DEBUG（避免噪音）
 - 三个端点：`POST /api/v1/deobfuscate`（64MB 上限）、`POST /api/v1/deobfuscate/plain`（成功返回 `text/plain` 完整日志，失败返回 JSON 错误）、`GET /api/v1/health`
@@ -15,7 +15,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 ## 关键约定
 
 ### 内置版本 + 透传
-**无硬编码版本清单**：`src/mapping/download.rs::is_version_supported` 运行时判断——外部映射目录存在 `<version>.tiny.gz` 即可反混淆，否则 → **原样透传**（`success: true`，计数为 0），不报错。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。
+**无硬编码版本清单**：`src/mapping/download.rs::is_version_supported` 运行时判断——外部映射目录存在 `<version>.tiny.gz` 即可反混淆，否则 → 若 `maven.auto_download` 开启且版本为 `1.x` 系 → 自动下载；都不行 → **原样透传**（`success: true`，计数为 0），不报错。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。
 
 ### 映射外置（与二进制同级部署）
 - **映射不嵌入二进制**：`build.rs`/`embedded.rs` 已移除，二进制 ~6MB
@@ -24,7 +24,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 - 加载：外部映射目录存在即用，否则透传
 
 ### 配置加载
-`Config::load()` 按顺序查找：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则使用默认值（`127.0.0.1:14523`）。配置项：`server.host`/`server.port`/`server.max_body_size`（默认 64MB）/`server.max_concurrency`（默认 32）/`maven.mappings_dir`（默认二进制同级 `./mappings`）；后三项未配置时分别由 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 环境变量兜底。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。
+`Config::load()` 按顺序查找：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则使用默认值（`127.0.0.1:14523`）。配置项：`server.host`/`server.port`/`server.max_body_size`（默认 64MB）/`server.max_concurrency`（默认 32）/`maven.mappings_dir`（默认二进制同级 `./mappings`）/`maven.auto_download`（默认 true）/`cache.enabled`（默认 true）/`cache.max_entries`（10）/`cache.high_watermark`（8）/`cache.low_watermark`（4）；后三项未配置时分别由 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 环境变量兜底。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。
 
 ### 版本格式兼容
 `src/mapping/tiny_v2.rs` 自动检测 v1（平铺 `CLASS`/`FIELD`/`METHOD`）和 v2（缩进 `c`/`\tf`/`\tm`）格式，列位置按头部命名空间名定位（兼容 1.14 特殊列序）。
