@@ -30,12 +30,19 @@ start_server() {
 
     SPINYARN_PID=$(RUST_LOG=error "$SPINYARN_BIN" > "$TEST_LOG" 2>&1 & echo $!)
 
-    for i in {1..40}; do
-        if curl -sf "${BASE_URL}/api/v1/health" >/dev/null 2>&1; then
-            echo "[✓] Server is ready (PID=${SPINYARN_PID})"
+    # The server auto-increments its port when the configured one is taken.
+    # Probe the base port and a range after it to find where it actually bound,
+    # so we never talk to an unrelated process listening on the base port.
+    local p
+    for offset in {0..30}; do
+        p=$((SPINYARN_PORT + offset))
+        if curl -sf --max-time 1 "http://${SPINYARN_HOST}:${p}/api/v1/health" >/dev/null 2>&1; then
+            BASE_URL="http://${SPINYARN_HOST}:${p}"
+            SPINYARN_PORT="$p"
+            echo "[✓] Server is ready (PID=${SPINYARN_PID}, port=${p})"
             return 0
         fi
-        sleep 0.5
+        sleep 0.3
     done
 
     echo "[✗] Server failed to start"

@@ -10,7 +10,7 @@ use crate::{
     api::AppState,
     deobfuscator::LineEngine,
     error::ApiError,
-    mapping::{download::{is_version_supported, load_mappings}, Mappings},
+    mapping::download::{is_version_supported, load_mappings},
 };
 
 #[derive(Debug, Deserialize)]
@@ -71,22 +71,20 @@ async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<Deobfuscat
     let mappings_dir = state.mappings_dir.clone();
 
     // CPU-bound: gzip decompress + parse.
-    let loaded: Result<Option<Mappings>, ApiError> = tokio::task::spawn_blocking(move || {
-        load_mappings(&version, &mappings_dir).map_err(|e| ApiError::Internal(e.to_string()))
-    })
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let loaded = tokio::task::spawn_blocking(move || load_mappings(&version, &mappings_dir))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let mappings = match loaded {
-        Ok(Some(m)) => m,
-        Ok(None) => {
+        Some(m) => m,
+        None => {
             // Version declared supported but no mapping available -> pass through.
             return Ok(DeobfuscateOutcome {
                 text: content,
                 stats: passthrough_stats(req.version),
             });
         }
-        Err(e) => return Err(e),
     };
 
     let deobfuscated = tokio::task::spawn_blocking(move || {

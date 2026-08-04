@@ -33,10 +33,12 @@ async fn main() {
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => break (listener, addr),
             Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                tracing::warn!("port {} in use, falling back to {}", port, port + 1);
-                port = port
-                    .checked_add(1)
-                    .expect("no free port in the whole range");
+                let Some(next) = port.checked_add(1) else {
+                    tracing::error!("no free port after {}", port);
+                    std::process::exit(1);
+                };
+                tracing::warn!("port {} in use, falling back to {}", port, next);
+                port = next;
             }
             Err(e) => panic!("failed to bind {}: {}", addr, e),
         }

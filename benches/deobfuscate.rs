@@ -35,7 +35,9 @@ fn bench_deobfuscate(c: &mut Criterion) {
     // ~5MB real-structure log: mostly noise lines, exercises the fast filter.
     let target = 5 * 1024 * 1024;
     let reps = target / real_log.len() + 1;
-    let big_log = real_log.clone().repeat(reps)[..target].to_string();
+    let mut big_log = real_log.clone().repeat(reps);
+    // Truncate on a char boundary to avoid panicking on non-ASCII content.
+    big_log.truncate(big_log.floor_char_boundary(target));
 
     c.bench_function("deobfuscate/pure_stack_5k", |b| {
         b.iter(|| black_box(engine.deobfuscate(black_box(&stack_log))))

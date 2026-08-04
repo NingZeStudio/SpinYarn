@@ -109,7 +109,7 @@ fn collect_cols(line: &str) -> [Option<&str>; 6] {
     out
 }
 
-/// Rough pre-allocation for the three tables based on line count.
+/// Rough pre-allocation for the lookup tables based on line count.
 fn prealloc(line_count: usize) -> Mappings {
     Mappings {
         classes: HashMap::with_capacity(line_count / 10),
