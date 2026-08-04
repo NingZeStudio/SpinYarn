@@ -19,6 +19,13 @@ async fn main() {
 
     let config = Config::load();
     tracing::info!("Bundled mappings dir: {}", config.maven.mappings_dir);
+    tracing::info!(
+        "cache: enabled={} max_entries={} high_watermark={} low_watermark={}",
+        config.cache.enabled,
+        config.cache.max_entries,
+        config.cache.high_watermark,
+        config.cache.low_watermark
+    );
     let app = build_router(config.clone());
 
     // Bind with port-auto-increment: if the configured/default port is taken,

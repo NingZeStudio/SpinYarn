@@ -127,6 +127,7 @@ fn download_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLo
     let metadata = String::from_utf8(http_get(MAVEN_METADATA_URL)?)
         .map_err(|e| MappingLoadError::Parse(e.to_string()))?;
     let Some(mvn_version) = find_latest_build(version, &metadata) else {
+        tracing::debug!("maven build not found for version {}", version);
         return Ok(false);
     };
 
@@ -136,7 +137,9 @@ fn download_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLo
         "https://maven.fabricmc.net/net/fabricmc/yarn/{}/yarn-{}-tiny.gz",
         encoded, encoded
     );
+    tracing::info!("mapping download: {} ({})", version, mvn_version);
     let bytes = http_get(&url)?;
+    tracing::info!("mapping downloaded: {} ({} bytes)", version, bytes.len());
 
     std::fs::create_dir_all(mappings_dir)?;
     let target = bundled_path(mappings_dir, version);
@@ -154,6 +157,7 @@ pub fn ensure_mapping(version: &str, mappings_dir: &str) -> Result<bool, Mapping
     }
     let path = bundled_path(mappings_dir, version);
     if path.exists() && mapping_fresh(&path) {
+        tracing::debug!("mapping fresh (cached): {}", version);
         return Ok(true);
     }
     // Missing or stale: try to (re)download.
@@ -162,7 +166,16 @@ pub fn ensure_mapping(version: &str, mappings_dir: &str) -> Result<bool, Mapping
         return Ok(true);
     }
     // Download failed; fall back to a stale file if one exists.
-    Ok(path.exists())
+    if path.exists() {
+        tracing::warn!(
+            "mapping download failed, falling back to stale file: {}",
+            version
+        );
+        Ok(true)
+    } else {
+        tracing::warn!("mapping unavailable: {} (auto-download failed)", version);
+        Ok(false)
+    }
 }
 
 fn parse_gz(bytes: &[u8]) -> Result<Mappings, MappingLoadError> {

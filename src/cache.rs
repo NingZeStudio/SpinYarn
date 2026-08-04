@@ -65,8 +65,10 @@ impl Cache {
         });
         if result.is_some() {
             inner.hits += 1;
+            tracing::debug!("cache hit: {}", version);
         } else {
             inner.misses += 1;
+            tracing::debug!("cache miss: {}", version);
         }
         result
     }
@@ -76,7 +78,11 @@ impl Cache {
     pub fn insert(&self, version: &str, mappings: Arc<Mappings>) {
         let tick = self.next_tick();
         let mut inner = self.inner.lock().unwrap();
+        let fresh = !inner.map.contains_key(version);
         inner.map.insert(version.to_string(), (mappings, tick));
+        if fresh {
+            tracing::info!("cache insert: {} (entries {})", version, inner.map.len());
+        }
 
         let max = self.cfg.max_entries.max(1);
         let high = self.cfg.high_watermark.clamp(1, max);
@@ -94,6 +100,13 @@ impl Cache {
                 for (k, _) in oldest.into_iter().take(remove) {
                     inner.map.remove(&k);
                     inner.evictions += 1;
+                    tracing::info!(
+                        "cache evict: {} (entries {}, high {} -> low {})",
+                        k,
+                        inner.map.len(),
+                        high,
+                        low
+                    );
                 }
             }
         }
