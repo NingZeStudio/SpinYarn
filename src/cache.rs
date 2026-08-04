@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::config::CacheConfig;
@@ -9,16 +10,21 @@ use crate::mapping::Mappings;
 /// Bounded by `max_entries`; watermark eviction kicks in once `high_watermark`
 /// entries are held, trimming back to `low_watermark` so the cache oscillates
 /// between the two levels instead of idling at full capacity.
+///
+/// Recency is tracked by a process-wide atomic tick: every `get`/`insert`
+/// consumes a unique monotonically increasing tick, and a hit stamps the
+/// entry with its tick. This keeps tick assignment lock-free and correct
+/// under concurrency.
 pub struct Cache {
     cfg: CacheConfig,
+    tick: AtomicU64,
     inner: Mutex<Inner>,
 }
 
 #[derive(Default)]
 struct Inner {
-    /// version -> (shared mappings, monotonic access tick)
+    /// version -> (shared mappings, recency tick)
     map: HashMap<String, (Arc<Mappings>, u64)>,
-    tick: u64,
     hits: u64,
     misses: u64,
     evictions: u64,
@@ -37,15 +43,22 @@ impl Cache {
     pub fn new(cfg: CacheConfig) -> Self {
         Self {
             cfg,
+            tick: AtomicU64::new(0),
             inner: Mutex::new(Inner::default()),
         }
     }
 
+    /// Consume the next unique recency tick.
+    fn next_tick(&self) -> u64 {
+        self.tick.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
     /// Look up a version, bumping its recency on a hit.
     pub fn get(&self, version: &str) -> Option<Arc<Mappings>> {
+        // Always consume a tick on get so hits bump recency (and the LRU order
+        // reflects every access, not just inserts).
+        let tick = self.next_tick();
         let mut inner = self.inner.lock().unwrap();
-        inner.tick += 1;
-        let tick = inner.tick;
         let result = inner.map.get_mut(version).map(|(m, last)| {
             *last = tick;
             Arc::clone(m)
@@ -61,9 +74,8 @@ impl Cache {
     /// Insert a version's mappings, then trim down to the low watermark if the
     /// high watermark has been reached (evicting least-recently-used entries).
     pub fn insert(&self, version: &str, mappings: Arc<Mappings>) {
+        let tick = self.next_tick();
         let mut inner = self.inner.lock().unwrap();
-        inner.tick += 1;
-        let tick = inner.tick;
         inner.map.insert(version.to_string(), (mappings, tick));
 
         let max = self.cfg.max_entries.max(1);
@@ -160,5 +172,43 @@ mod tests {
         assert!(c.get("v2").is_some(), "v2 was touched, must survive");
         assert!(c.get("v3").is_none(), "v3 untouched -> evicted");
         assert!(c.get("v6").is_some());
+    }
+
+    #[test]
+    fn test_get_updates_recency() {
+        let c = Cache::new(cfg(true, 10, 5, 2));
+        for i in 0..4 {
+            c.insert(&format!("v{}", i), mappings("x"));
+        }
+        // Touch the oldest (v0) so it survives the eviction triggered by v4.
+        assert!(c.get("v0").is_some());
+        c.insert("v4", mappings("x")); // len 5 -> evict 3 (v1,v2,v3)
+        assert!(c.get("v0").is_some(), "get must bump recency");
+        assert!(c.get("v1").is_none(), "un-touched oldest evicted");
+    }
+
+    #[test]
+    fn test_concurrent_access() {
+        let c = std::sync::Arc::new(Cache::new(cfg(true, 32, 30, 20)));
+        let mut handles = Vec::new();
+        for t in 0..8 {
+            let c = Arc::clone(&c);
+            handles.push(std::thread::spawn(move || {
+                for i in 0..60 {
+                    let v = format!("v{}", (i + t) % 12);
+                    if i % 3 == 0 {
+                        c.insert(&v, mappings(&v));
+                    } else {
+                        let _ = c.get(&v);
+                    }
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let s = c.stats();
+        assert!(s.entries <= 32, "entries={} exceeds max", s.entries);
+        assert!(s.hits + s.misses > 0);
     }
 }
