@@ -4,6 +4,9 @@
 # Copied binary (single-file deployment convenience)
 /spinyarn
 
+# ZeroTermux Editor GUI scaffold (not part of the project)
+/build.sh
+
 # Logs & temp
 *.log
 *.log.txt
