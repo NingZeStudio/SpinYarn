@@ -5,13 +5,13 @@
 ## [Unreleased]
 
 ### 新增
-- 反混淆路径并发限流（`src/api/deobfuscate.rs::GATE`，`SPINYARN_MAX_CONCURRENCY` 可调，默认 32）：无缓存模型下每个在途请求持有 ~30MB 版本表，限流将峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
+- 反混淆路径并发限流（`src/api/deobfuscate.rs::GATE`，`SPINYARN_MAX_CONCURRENCY` 可调，默认 32）：无缓存模型下每个在途请求持有 ~10MB 版本表，限流将峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
 - HTTP 访问日志中间件（`tower_http::TraceLayer`）：记录 method/uri/status/耗时；deobfuscate 走 INFO，health 探针走 DEBUG 降噪
 - 默认端口改为 14523，端口被占用时自动 +1 递增直至找到空闲端口
 - `POST /api/v1/deobfuscate/plain` 纯文本端点：成功返回 `text/plain` 完整反混淆日志，免 JSON 转义；失败仍返回 JSON 错误
 - **嵌套类裸键反向索引**（`Mappings::nested`）：缺外层的裸嵌套键（`class_7512` → `DimensionType$MonsterSettings`）可反混淆，仅对全局唯一内层键建立，重复键跳过防歧义
 - **运行时自动下载**（`maven.auto_download`，默认 true）：`1.x` 系缺失版本（含 `-pre`/`-rc`，排除 `25wxx` 快照与 26.x）自动从 Fabric Maven 下载映射落盘，TTL 7 天，过期重下载失败回退旧文件
-- **有界 LRU 缓存**（`[cache]` 段，`src/cache.rs`）：解析后表以 `Arc<Mappings>` 缓存，上限 10 条目、高水位 8 触发批量淘汰至低水位 4；命中跳过加载（热请求 ~6ms）且不占并发信号量；命中/驱逐/条目数经 `/health` 暴露
+- **有界 LRU 缓存**（`[cache]` 段，`src/cache.rs`）：解析后表以 `Arc<Mappings>` 缓存，默认上限 32 条目、高水位 30 触发批量淘汰至低水位 20；命中跳过加载（热请求 ~6ms）且不占并发信号量；命中/驱逐/条目数经 `/health` 暴露。实测：单版本解析表 ~10MB，缓存 20 条目 ~189MB、峰值 30 条目 ~300MB
 
 ### 变更
 - **breaking change**：`/api/v1/deobfuscate` 响应移除 `original` 字段（客户端持有原文），仅返回 `deobfuscated` + `stats`
