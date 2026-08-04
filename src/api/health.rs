@@ -4,16 +4,18 @@ use serde::Serialize;
 use std::sync::atomic::Ordering;
 
 use crate::api::AppState;
+use crate::cache::CacheStats;
 
 #[derive(Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
     pub uptime_seconds: u64,
+    pub cache: Option<CacheStats>,
 }
 
 #[axum::debug_handler]
 pub async fn handler(
-    _state: State<AppState>,
+    state: State<AppState>,
 ) -> Json<crate::api::response::ApiResponse<HealthResponse>> {
     let start_secs = crate::START_TIME.load(Ordering::Relaxed);
     let uptime = if start_secs > 0 {
@@ -26,8 +28,11 @@ pub async fn handler(
         0
     };
 
+    let cache = state.cache.as_ref().map(|c| c.stats());
+
     Json(crate::api::response::ApiResponse::success(HealthResponse {
         status: "healthy",
         uptime_seconds: uptime,
+        cache,
     }))
 }

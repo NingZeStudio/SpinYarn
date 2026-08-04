@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::deobfuscator::pattern::RESIDUAL_PATTERN;
 use crate::mapping::Mappings;
@@ -20,10 +20,7 @@ pub struct DeobfuscateResult {
 /// - Lookup tables are global (`method_XXXX` / `field_XXXX` are globally unique).
 /// - The engine owns no cache; build once per request and drop.
 pub struct LineEngine {
-    classes: HashMap<String, String>,
-    methods: HashMap<String, String>,
-    fields: HashMap<String, String>,
-    nested: HashMap<String, String>,
+    mappings: Arc<Mappings>,
 }
 
 fn strip_module_prefix(class_part: &str) -> &str {
@@ -47,11 +44,13 @@ fn strip_module_prefix(class_part: &str) -> &str {
 impl LineEngine {
     pub fn new(mappings: Mappings) -> Self {
         Self {
-            classes: mappings.classes,
-            methods: mappings.methods,
-            fields: mappings.fields,
-            nested: mappings.nested,
+            mappings: Arc::new(mappings),
         }
+    }
+
+    /// Build from an already-shared mapping table (e.g. a cache hit).
+    pub fn from_arc(mappings: Arc<Mappings>) -> Self {
+        Self { mappings }
     }
 
     pub fn deobfuscate(&self, input: &str) -> DeobfuscateResult {
@@ -138,7 +137,7 @@ impl LineEngine {
         let mut method_hit = false;
         let mut new_method = method.to_string();
         if method.starts_with("method_") {
-            if let Some(named) = self.methods.get(method) {
+            if let Some(named) = self.mappings.methods.get(method) {
                 new_method = named.clone();
                 method_hit = true;
             }
@@ -193,10 +192,11 @@ impl LineEngine {
         }
 
         let Some(named) = self
+            .mappings
             .classes
             .get(key)
-            .or_else(|| self.nested.get(key))
-            .or_else(|| key.rfind('$').and_then(|d| self.classes.get(&key[..d])))
+            .or_else(|| self.mappings.nested.get(key))
+            .or_else(|| key.rfind('$').and_then(|d| self.mappings.classes.get(&key[..d])))
         else {
             return paren.to_string();
         };
@@ -222,14 +222,14 @@ impl LineEngine {
             return None;
         }
 
-        if let Some(named) = self.classes.get(key) {
+        if let Some(named) = self.mappings.classes.get(key) {
             return Some(named);
         }
-        if let Some(named) = self.nested.get(key) {
+        if let Some(named) = self.mappings.nested.get(key) {
             return Some(named);
         }
         if let Some(dollar) = key.rfind('$') {
-            return self.classes.get(&key[..dollar]).map(|s| s.as_str());
+            return self.mappings.classes.get(&key[..dollar]).map(|s| s.as_str());
         }
         None
     }
@@ -263,7 +263,7 @@ impl LineEngine {
             let prefix = caps.name("prefix").map(|p| p.as_str()).unwrap_or("");
 
             let replacement = if key.starts_with("class_") {
-                self.classes.get(key).or_else(|| self.nested.get(key)).map(|n| {
+                self.mappings.classes.get(key).or_else(|| self.mappings.nested.get(key)).map(|n| {
                     if prefix.contains('.') {
                         n.replace('/', ".")
                     } else {
@@ -271,9 +271,9 @@ impl LineEngine {
                     }
                 })
             } else if key.starts_with("method_") {
-                self.methods.get(key).cloned()
+                self.mappings.methods.get(key).cloned()
             } else {
-                self.fields.get(key).cloned()
+                self.mappings.fields.get(key).cloned()
             };
 
             let Some(rep) = replacement else { continue };

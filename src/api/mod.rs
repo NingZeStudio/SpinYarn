@@ -8,18 +8,21 @@ use tower_http::{
 };
 use tracing::{debug_span, info_span, Span};
 
+use crate::cache::Cache;
 use crate::config::Config;
 
 mod deobfuscate;
 mod health;
 mod response;
 
-/// Router-wide state: the deobfuscation concurrency gate and the external
-/// mappings directory (both driven by `config.toml`).
+/// Router-wide state: the deobfuscation concurrency gate, the external
+/// mappings directory, auto-download toggle, and the in-memory mapping cache.
 #[derive(Clone)]
 pub struct AppState {
     pub gate: Arc<Semaphore>,
     pub mappings_dir: String,
+    pub auto_download: bool,
+    pub cache: Option<Arc<Cache>>,
 }
 
 fn make_info_span(request: &axum::extract::Request) -> Span {
@@ -94,6 +97,12 @@ pub fn build_router(config: Config) -> Router {
         .with_state(AppState {
             gate: Arc::new(Semaphore::new(config.server.max_concurrency)),
             mappings_dir: config.maven.mappings_dir,
+            auto_download: config.maven.auto_download,
+            cache: if config.cache.enabled {
+                Some(Arc::new(Cache::new(config.cache.clone())))
+            } else {
+                None
+            },
         });
     Router::new().merge(api_routes).layer(cors)
 }

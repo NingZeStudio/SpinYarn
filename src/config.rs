@@ -20,6 +20,8 @@ pub struct Config {
     pub server: ServerConfig,
     #[serde(default)]
     pub maven: MavenConfig,
+    #[serde(default)]
+    pub cache: CacheConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -38,6 +40,8 @@ pub struct ServerConfig {
 pub struct MavenConfig {
     #[serde(default = "default_mappings_dir")]
     pub mappings_dir: String,
+    #[serde(default = "default_auto_download")]
+    pub auto_download: bool,
 }
 
 fn default_host() -> String {
@@ -64,6 +68,48 @@ fn default_mappings_dir() -> String {
         .unwrap_or_else(|| exe_dir().join("mappings").to_string_lossy().into_owned())
 }
 
+/// Auto-download missing mapping files from Fabric Maven at runtime (default on).
+fn default_auto_download() -> bool {
+    true
+}
+
+/// In-memory LRU cache of parsed mappings with watermark eviction.
+#[derive(Debug, Deserialize, Clone)]
+pub struct CacheConfig {
+    #[serde(default = "default_cache_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_cache_max_entries")]
+    pub max_entries: usize,
+    #[serde(default = "default_cache_high")]
+    pub high_watermark: usize,
+    #[serde(default = "default_cache_low")]
+    pub low_watermark: usize,
+}
+
+fn default_cache_enabled() -> bool {
+    true
+}
+fn default_cache_max_entries() -> usize {
+    10
+}
+fn default_cache_high() -> usize {
+    8
+}
+fn default_cache_low() -> usize {
+    4
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_cache_enabled(),
+            max_entries: default_cache_max_entries(),
+            high_watermark: default_cache_high(),
+            low_watermark: default_cache_low(),
+        }
+    }
+}
+
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
@@ -79,6 +125,7 @@ impl Default for MavenConfig {
     fn default() -> Self {
         Self {
             mappings_dir: default_mappings_dir(),
+            auto_download: default_auto_download(),
         }
     }
 }

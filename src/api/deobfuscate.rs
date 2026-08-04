@@ -10,7 +10,7 @@ use crate::{
     api::AppState,
     deobfuscator::LineEngine,
     error::ApiError,
-    mapping::download::{is_version_supported, load_mappings},
+    mapping::download::{ensure_mapping, is_downloadable_version, is_version_supported, load_mappings},
 };
 
 #[derive(Debug, Deserialize)]
@@ -50,13 +50,52 @@ fn passthrough_stats(version: String) -> DeobfuscateStats {
 }
 
 /// Shared pipeline for both JSON and plain-text handlers:
-/// passthrough check -> concurrency gate -> load mappings -> deobfuscate.
+/// passthrough check -> (auto-download) -> cache lookup -> gate/load -> deobfuscate.
 async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<DeobfuscateOutcome, ApiError> {
     if !is_version_supported(&req.version, &state.mappings_dir) {
-        return Ok(DeobfuscateOutcome {
-            text: req.content,
-            stats: passthrough_stats(req.version),
-        });
+        // Missing locally: if it's a downloadable 1.x token and auto-download is
+        // enabled, try to fetch it once; otherwise fall through to passthrough.
+        if state.auto_download && is_downloadable_version(&req.version) {
+            let version = req.version.clone();
+            let mappings_dir = state.mappings_dir.clone();
+            let ready = tokio::task::spawn_blocking(move || ensure_mapping(&version, &mappings_dir))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            if !ready {
+                return Ok(DeobfuscateOutcome {
+                    text: req.content,
+                    stats: passthrough_stats(req.version),
+                });
+            }
+        } else {
+            return Ok(DeobfuscateOutcome {
+                text: req.content,
+                stats: passthrough_stats(req.version),
+            });
+        }
+    }
+
+    // Cache hit: share the already-parsed table, skip the gate (nothing loads).
+    if let Some(cache) = &state.cache {
+        if let Some(shared) = cache.get(&req.version) {
+            let content = req.content;
+            let deobfuscated = tokio::task::spawn_blocking(move || {
+                LineEngine::from_arc(shared).deobfuscate(&content)
+            })
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+            return Ok(DeobfuscateOutcome {
+                text: deobfuscated.text,
+                stats: DeobfuscateStats {
+                    version: req.version,
+                    classes_mapped: deobfuscated.classes_mapped,
+                    methods_mapped: deobfuscated.methods_mapped,
+                    fields_mapped: deobfuscated.fields_mapped,
+                    total_time_ms: deobfuscated.total_time_ms,
+                },
+            });
+        }
     }
 
     // Bound peak memory: at most N in-flight mapping table sets.
@@ -87,9 +126,14 @@ async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<Deobfuscat
         }
     };
 
+    // Populate the cache with the parsed table, sharing the same Arc we deobfuscate with.
+    let shared = std::sync::Arc::new(mappings);
+    if let Some(cache) = &state.cache {
+        cache.insert(&req.version, std::sync::Arc::clone(&shared));
+    }
+
     let deobfuscated = tokio::task::spawn_blocking(move || {
-        let engine = LineEngine::new(mappings);
-        engine.deobfuscate(&content)
+        LineEngine::from_arc(shared).deobfuscate(&content)
     })
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
