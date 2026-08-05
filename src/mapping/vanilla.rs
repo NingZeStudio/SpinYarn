@@ -69,6 +69,22 @@ impl VanillaMappings {
             .get(name)
             .map(|s| s.as_str())
     }
+
+    /// (classes, methods, fields, classes-with-method-index) for statistics.
+    pub fn stats(&self) -> (usize, usize, usize, usize) {
+        let methods: usize = self
+            .methods_by_class
+            .values()
+            .map(|mm| mm.values().map(|v| v.len()).sum::<usize>())
+            .sum();
+        let fields: usize = self.fields_by_class.values().map(|fm| fm.len()).sum();
+        (
+            self.classes.len(),
+            methods,
+            fields,
+            self.methods_by_class.len(),
+        )
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
