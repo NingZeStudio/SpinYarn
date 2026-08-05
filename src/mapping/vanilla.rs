@@ -128,6 +128,31 @@ pub fn parse_tsrg(input: &str) -> Result<VanillaMappings, VanillaParseError> {
     Ok(m)
 }
 
+/// Whether a Vanilla mapping file exists for a version.
+pub fn is_vanilla_supported(version: &str, mappings_dir: &str) -> bool {
+    std::path::Path::new(mappings_dir)
+        .join("vanilla")
+        .join(format!("{}.txt", version))
+        .exists()
+}
+
+/// Load a Vanilla mapping file from `<mappings_dir>/vanilla/<version>.txt`.
+/// Returns `Ok(None)` when no file provides the version.
+pub fn load_vanilla_mappings(
+    version: &str,
+    mappings_dir: &str,
+) -> Result<Option<VanillaMappings>, VanillaParseError> {
+    let path = std::path::Path::new(mappings_dir)
+        .join("vanilla")
+        .join(format!("{}.txt", version));
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| VanillaParseError::InvalidLine(format!("read {}: {}", path.display(), e)))?;
+    parse_tsrg(&content).map(Some)
+}
+
 fn parse_class_line(s: &str) -> Option<(String, String)> {
     // `<readable> -> <obfuscated>:` (split at the last separator)
     let rest = s.strip_suffix(':')?;

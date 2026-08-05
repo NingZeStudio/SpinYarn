@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::config::CacheConfig;
-use crate::mapping::Mappings;
+use crate::mapping::dispatcher::LoadedMappings;
 
-/// In-memory LRU cache of parsed `Mappings` shared via `Arc`.
+/// In-memory LRU cache of parsed mapping sets (Yarn/Vanilla) shared via `Arc`.
 ///
 /// Bounded by `max_entries`; watermark eviction kicks in once `high_watermark`
 /// entries are held, trimming back to `low_watermark` so the cache oscillates
@@ -24,7 +24,7 @@ pub struct Cache {
 #[derive(Default)]
 struct Inner {
     /// version -> (shared mappings, recency tick)
-    map: HashMap<String, (Arc<Mappings>, u64)>,
+    map: HashMap<String, (Arc<LoadedMappings>, u64)>,
     hits: u64,
     misses: u64,
     evictions: u64,
@@ -54,7 +54,7 @@ impl Cache {
     }
 
     /// Look up a version, bumping its recency on a hit.
-    pub fn get(&self, version: &str) -> Option<Arc<Mappings>> {
+    pub fn get(&self, version: &str) -> Option<Arc<LoadedMappings>> {
         // Always consume a tick on get so hits bump recency (and the LRU order
         // reflects every access, not just inserts).
         let tick = self.next_tick();
@@ -75,7 +75,7 @@ impl Cache {
 
     /// Insert a version's mappings, then trim down to the low watermark if the
     /// high watermark has been reached (evicting least-recently-used entries).
-    pub fn insert(&self, version: &str, mappings: Arc<Mappings>) {
+    pub fn insert(&self, version: &str, mappings: Arc<LoadedMappings>) {
         let tick = self.next_tick();
         let mut inner = self.inner.lock().unwrap();
         let fresh = !inner.map.contains_key(version);
@@ -137,10 +137,10 @@ mod tests {
         }
     }
 
-    fn mappings(id: &str) -> Arc<Mappings> {
-        let mut m = Mappings::default();
+    fn mappings(id: &str) -> Arc<LoadedMappings> {
+        let mut m = crate::mapping::Mappings::default();
         m.classes.insert(id.to_string(), id.to_string());
-        Arc::new(m)
+        Arc::new(LoadedMappings::Yarn(Arc::new(m)))
     }
 
     #[test]

@@ -1,3 +1,4 @@
+pub mod dispatcher;
 pub mod download;
 pub mod tiny_v2;
 pub mod vanilla;
