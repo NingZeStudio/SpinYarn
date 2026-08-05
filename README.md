@@ -5,7 +5,8 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 ## 特性
 
 - **映射外置部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射放在**二进制同级 `./mappings/`** 目录（不嵌入二进制，~6MB），部署时把二者放同一目录即可
-- **自动下载**：请求的 `1.x` 版本不在本地时自动从 Fabric Maven 下载映射（落盘缓存 7 天），新版本/预发布无需改代码
+- **自动下载**：请求的 `1.x` 版本不在本地时自动从对应源下载映射（落盘缓存 7 天），新版本/预发布无需改代码
+- **双映射类型**：`mapping_type` 参数支持 Fabric（`yarn`，默认）与 Vanilla（`vanilla`，Mojang official mappings，含行号定位重载）
 - **LRU 热门缓存**：`[cache]` 段启用有界 LRU（默认 44 条目 + 水位线 40/30，共享缓存池），热版本命中跳过加载（~6ms）；实测水位 30~40 条目 ≈ 300~400MB；命中/驱逐/条目数经 `/health` 暴露
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，单版本解析表 ~10MB，不随请求版本数增长
 - **并发限流**：`server.max_concurrency`（默认 32）信号量把峰值内存钉在 N×单版本，突发流量 OOM 换成短暂排队
@@ -67,9 +68,12 @@ low_watermark = 30         # 淘汰到该水位
 ```json
 {
   "content": "at net.minecraft.class_310.method_55608(Client.java:465)",
-  "version": "1.21.9"
+  "version": "1.21.9",
+  "mapping_type": "yarn"
 }
 ```
+
+`mapping_type`：`yarn`（默认，Fabric）/ `vanilla`（Mojang official，处理短混淆名堆栈，如 `at fda.o(SourceFile.java:14)`）。
 
 响应：
 

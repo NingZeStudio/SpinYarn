@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### 新增
+- **Vanilla（Mojang official mappings）反混淆支持**：
+  - TSRG 解析器（`src/mapping/vanilla.rs`：类/方法/字段 + 行号区间，类内方法索引应对短混淆名全局不唯一）
+  - Vanilla 结构化堆栈引擎（`src/deobfuscator/vanilla.rs`：类确认 + TSRG 行号区间定位重载，短名不适用 residual 正则，未映射行透传）
+  - 调度机（`src/mapping/dispatcher.rs`）：按 `mapping_type`（`yarn`/`vanilla`）分派加载与引擎
+  - 自动下载扩展：Vanilla 走 Mojang launcher meta（`mappings/vanilla/<version>.txt`，TTL 7 天），与 Yarn 共用版本白名单
+  - 缓存共享池 key 改 `version+mapping_type`，存 `Arc<LoadedMappings>`
+  - 实测：`at fda.o(SourceFile.java:14)` → `BeeFlyingSoundInstance.getAlternativeSoundInstance`（1.18.2-pre1 自动下载 6.4MB）
+
 ### 变更
 - LRU 缓存默认水位调整：`max_entries` 32→44、高水位 30→40、低水位 20→30（共享缓存池，为 Vanilla/Fabric 同池缓存预留；水位 30~40 条目 ≈ 300~400MB）
 

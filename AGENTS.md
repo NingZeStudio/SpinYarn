@@ -4,9 +4,10 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 
 ## 架构要点
 
-- **无缓存模型（基础）+ LRU 缓存（默认开启）**：无缓存时每请求独立加载映射 → 反混淆 → 释放（单版本解析表实测 ~10MB）。`[cache]` 段启用**有界 LRU**（`src/cache.rs`，默认 `max_entries=44`/高水位 40/低水位 30，**共享缓存池**——未来 Vanilla/Fabric 映射同池缓存）：解析后表以 `Arc<Mappings>` 缓存，高水位触发批量淘汰至低水位，缓存大小在低~高水位间波动（避免长期满载）；命中请求跳过加载（热请求 ~6ms）且不占并发信号量。实测：缓存水位 30~40 条目 ≈ 300~400MB（服务器内存可承受）；命中/驱逐/条目数经 `/health` 暴露
+- **无缓存模型（基础）+ LRU 缓存（默认开启）**：无缓存时每请求独立加载映射 → 反混淆 → 释放（单版本解析表实测 ~10MB）。`[cache]` 段启用**有界 LRU**（`src/cache.rs`，默认 `max_entries=44`/高水位 40/低水位 30，**共享缓存池**——Yarn/Vanilla 映射同池缓存，key 为 `version+mapping_type`）：解析后表以 `Arc<LoadedMappings>` 缓存，高水位触发批量淘汰至低水位，缓存大小在低~高水位间波动（避免长期满载）；命中请求跳过加载（热请求 ~6ms）且不占并发信号量。实测：缓存水位 30~40 条目 ≈ 300~400MB（服务器内存可承受）；命中/驱逐/条目数经 `/health` 暴露
 - **并发限流**：`src/api/mod.rs::AppState` 的 `Semaphore`，默认 32（`config.toml` 的 `server.max_concurrency` 可调，未配置时 `SPINYARN_MAX_CONCURRENCY` 环境变量兜底）。无缓存模型下每并发请求持有一整套版本表（~10MB），限流把峰值内存钉在 N×10MB，突发流量 OOM 换成短暂排队（稳态并发约 16，平时不触发）
-- **自动下载**：`maven.auto_download`（默认 true）时，请求版本不在本地且为 `1.x` 系（含 `-pre`/`-rc`，快照 `25wxx` 与 26.x 排除）→ 从 Fabric Maven 自动下载映射落盘（TTL 7 天，过期重下载失败回退旧文件），无需改代码即支持新版本
+- **自动下载**：`maven.auto_download`（默认 true）时，请求版本不在本地且为 `1.x` 系（含 `-pre`/`-rc`，快照 `25wxx` 与 26.x 排除）→ 按类型自动下载映射落盘（TTL 7 天，过期重下载失败回退旧文件）：Yarn 走 Fabric Maven（`.tiny.gz`），Vanilla 走 Mojang launcher meta（`client.txt` 存 `mappings/vanilla/<version>.txt`），无需改代码即支持新版本
+- **双映射类型**：请求 `mapping_type` 参数（`yarn` 默认 / `vanilla`）；`src/mapping/dispatcher.rs` 调度机负责按类型加载与分派引擎（`LineEngine` / `VanillaEngine`）。Vanilla 用 TSRG 解析器（`src/mapping/vanilla.rs`），短混淆名只能走结构化堆栈解析（类确认 + TSRG 行号区间定位重载），不适用 residual 正则
 - CPU 密集操作（gzip 解压 + 解析 + 反混淆）放入 `tokio::task::spawn_blocking`，不阻塞 runtime
 - **访问日志中间件**：`tower_http::TraceLayer` 记录每个请求的 method/uri/status/耗时。deobfuscate 走 INFO，health 探针走 DEBUG（避免噪音）
 - 三个端点：`POST /api/v1/deobfuscate`（64MB 上限）、`POST /api/v1/deobfuscate/plain`（成功返回 `text/plain` 完整日志，失败返回 JSON 错误）、`GET /api/v1/health`
