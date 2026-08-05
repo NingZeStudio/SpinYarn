@@ -4,6 +4,10 @@
 # Copied binary (single-file deployment convenience)
 /spinyarn
 
+# Vanilla (Mojang official) mappings are large (~300MB); download via
+# scripts/download_vanilla_mappings.py instead of committing them.
+/mappings/vanilla/
+
 # ZeroTermux Editor GUI scaffold (not part of the project)
 /build.sh
 

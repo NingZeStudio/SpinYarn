@@ -64,3 +64,17 @@ fn test_snapshot_vanilla_1_21_4() {
     let out = engine.deobfuscate(&input);
     assert_snapshot("1.21.4-vanilla.log.snap", &out.text);
 }
+
+#[test]
+fn test_snapshot_sherlock_1_18_2_pre1() {
+    // Sherlock 测试样本（Fabric，pre-release）。
+    let out = deobfuscate_fixture("tests/fixtures/1.18.2-pre1.log", "1.18.2-pre1");
+    assert_snapshot("1.18.2-pre1.log.snap", &out);
+}
+
+#[test]
+fn test_snapshot_sherlock_1_21_3() {
+    // Sherlock 测试样本（Fabric crash report）。
+    let out = deobfuscate_fixture("tests/fixtures/1.21.3-crash-report.txt", "1.21.3");
+    assert_snapshot("1.21.3-crash-report.txt.snap", &out);
+}
