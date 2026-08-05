@@ -1,0 +1,17 @@
+[12:34:56] [main/INFO]: Loading Minecraft 1.21.4 with Mojang mappings
+[12:34:56] [main/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[12:34:58] [Render thread/ERROR]: Exception caught during firing event
+java.lang.RuntimeException: Failed to tick server
+	at flk.a(SourceFile.java:771)
+	at flk.f(SourceFile.java:910)
+	at ard.<init>(SourceFile.java:5)
+	at fda.b(SourceFile.java:13)
+	at fda.<init>(SourceFile.java:17)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.lang.NullPointerException: Cannot invoke "Object.toString()" because it is null
+	at flk.a(SourceFile.java:730)
+	at flk.c(SourceFile.java:750)
+	... 5 more
+[12:35:00] [Render thread/INFO]: [STDOUT]: minecraft/seed/-7175373930117398063
+[12:35:00] [Render thread/INFO]: Done (2.111s)!

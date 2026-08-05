@@ -2,7 +2,8 @@ use std::io::Read;
 use std::path::Path;
 
 use flate2::read::GzDecoder;
-use spinyarn::deobfuscator::LineEngine;
+use spinyarn::deobfuscator::{LineEngine, VanillaEngine};
+use spinyarn::mapping::vanilla::parse_tsrg;
 use spinyarn::mapping::{parse, Mappings};
 
 /// Load mappings from the external `mappings/<version>.tiny.gz` file
@@ -51,4 +52,15 @@ fn test_snapshot_crash_1_21_9() {
 fn test_snapshot_fcl_1_21_11() {
     let out = deobfuscate_fixture("tests/fixtures/1.21.11-fcl.log.txt", "1.21.11");
     assert_snapshot("1.21.11-fcl.log.txt.snap", &out);
+}
+
+#[test]
+fn test_snapshot_vanilla_1_21_4() {
+    // Vanilla: self-contained fixture (real 1.21.4 mapping slice + simulated log).
+    let tsrg = std::fs::read_to_string("tests/fixtures/test-mappings-vanilla.tsrg").unwrap();
+    let mappings = parse_tsrg(&tsrg).unwrap();
+    let engine = VanillaEngine::new(mappings);
+    let input = std::fs::read_to_string("tests/fixtures/1.21.4-vanilla.log").unwrap();
+    let out = engine.deobfuscate(&input);
+    assert_snapshot("1.21.4-vanilla.log.snap", &out.text);
 }

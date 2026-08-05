@@ -1,0 +1,20 @@
+# Mojang official mappings (TSRG) — 1.21.4 真实映射裁剪
+# 来源：Mojang version manifest client_mappings（仅保留测试涉及类）
+# 格式：可读类名 -> 混淆类名: / <start>:<end>:<返回> <可读方法>(<参数>) -> <混淆方法> / <类型> <可读字段> -> <混淆字段>
+com.mojang.blaze3d.Blaze3D -> fda:
+    9:10:void youJustLostTheGame() -> a
+    13:13:double getTime() -> b
+    16:17:void <init>() -> <init>
+net.minecraft.client.Minecraft -> flk:
+    729:733:void onResourceLoadFinished(net.minecraft.client.Minecraft$GameLoadCookie) -> a
+    770:795:void addInitialScreens(java.util.List) -> a
+    799:801:boolean countryEqualsISO3(java.lang.Object) -> a
+    836:839:com.mojang.authlib.minecraft.UserApiService createUserApiService(com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService,net.minecraft.client.main.GameConfig) -> a
+    903:948:void run() -> f
+    746:746:boolean isGameLoadFinished() -> c
+    750:766:java.lang.Runnable buildInitialScreens(net.minecraft.client.Minecraft$GameLoadCookie) -> c
+    org.slf4j.Logger LOGGER -> G
+    boolean ON_OSX -> a
+net.minecraft.server.level.ServerLevel -> ard:
+    0:100:void <init>(net.minecraft.server.MinecraftServer,net.minecraft.server.WorldStem,net.minecraft.server.level.ServerLevel$ServerLevelData,net.minecraft.resources.ResourceKey) -> <init>
+    java.util.List players -> I
