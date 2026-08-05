@@ -178,6 +178,85 @@ pub fn ensure_mapping(version: &str, mappings_dir: &str) -> Result<bool, Mapping
     }
 }
 
+/// Path of a Vanilla (TSRG) mapping file: `<mappings_dir>/vanilla/<version>.txt`
+fn vanilla_path(mappings_dir: &str, version: &str) -> PathBuf {
+    Path::new(mappings_dir)
+        .join("vanilla")
+        .join(format!("{}.txt", version))
+}
+
+/// Locate the Mojang official `client_mappings` URL for a version via the
+/// launcher version manifest.
+fn find_vanilla_mapping_url(version: &str) -> Result<Option<String>, MappingLoadError> {
+    let manifest: serde_json::Value = serde_json::from_slice(&http_get(
+        "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json",
+    )?)
+    .map_err(|e| MappingLoadError::Parse(e.to_string()))?;
+
+    let version_url = manifest
+        .get("versions")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter().find(|v| v.get("id").and_then(|s| s.as_str()) == Some(version))
+        })
+        .and_then(|v| v.get("url"))
+        .and_then(|u| u.as_str())
+        .ok_or_else(|| MappingLoadError::Parse("version not found in launcher manifest".to_string()))?;
+
+    let version_json: serde_json::Value = serde_json::from_slice(&http_get(version_url)?)
+        .map_err(|e| MappingLoadError::Parse(e.to_string()))?;
+
+    Ok(version_json
+        .get("downloads")
+        .and_then(|d| d.get("client_mappings"))
+        .and_then(|cm| cm.get("url"))
+        .and_then(|u| u.as_str())
+        .map(str::to_string))
+}
+
+/// Download the Vanilla (Mojang official) mapping for `version` into
+/// `<mappings_dir>/vanilla/<version>.txt` (temp file + atomic rename).
+fn download_vanilla_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLoadError> {
+    let Some(url) = find_vanilla_mapping_url(version)? else {
+        tracing::debug!("vanilla mapping not found for version {}", version);
+        return Ok(false);
+    };
+    tracing::info!("vanilla mapping download: {}", version);
+    let bytes = http_get(&url)?;
+    tracing::info!(
+        "vanilla mapping downloaded: {} ({} bytes)",
+        version,
+        bytes.len()
+    );
+
+    let dir = Path::new(mappings_dir).join("vanilla");
+    std::fs::create_dir_all(&dir)?;
+    let target = dir.join(format!("{}.txt", version));
+    let tmp = target.with_extension("tmp");
+    std::fs::write(&tmp, &bytes)?;
+    std::fs::rename(&tmp, &target)?;
+    Ok(true)
+}
+
+/// Ensure a downloadable Vanilla version's mapping exists locally (7-day TTL).
+/// Returns whether the mapping is ready to use.
+pub fn ensure_vanilla_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLoadError> {
+    if !is_valid_version(version) || !is_downloadable_version(version) {
+        return Ok(false);
+    }
+    let path = vanilla_path(mappings_dir, version);
+    if path.exists() && mapping_fresh(&path) {
+        tracing::debug!("vanilla mapping fresh (cached): {}", version);
+        return Ok(true);
+    }
+    let ok = download_vanilla_mapping(version, mappings_dir)?;
+    if ok {
+        return Ok(true);
+    }
+    // Download failed; fall back to a stale file if one exists.
+    Ok(path.exists())
+}
+
 fn parse_gz(bytes: &[u8]) -> Result<Mappings, MappingLoadError> {
     let mut decoder = GzDecoder::new(bytes);
     let mut out = Vec::new();

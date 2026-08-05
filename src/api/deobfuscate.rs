@@ -8,11 +8,10 @@ use serde::Deserialize;
 
 use crate::{
     api::AppState,
-    deobfuscator::LineEngine,
     error::ApiError,
     mapping::{
         dispatcher::{self, MappingType},
-        download::{ensure_mapping, is_downloadable_version},
+        download::{ensure_mapping, ensure_vanilla_mapping, is_downloadable_version},
     },
 };
 
@@ -74,17 +73,17 @@ async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<Deobfuscat
     let mtype = MappingType::parse(&req.mapping_type);
 
     if !dispatcher::is_supported(&req.version, &state.mappings_dir, mtype) {
-        // Auto-download only applies to Yarn (Vanilla data source not wired yet).
-        if mtype == MappingType::Yarn
-            && state.auto_download
-            && is_downloadable_version(&req.version)
-        {
+        // Auto-download applies to both families when the version token matches.
+        if state.auto_download && is_downloadable_version(&req.version) {
             let version = req.version.clone();
             let mappings_dir = state.mappings_dir.clone();
-            let ready = tokio::task::spawn_blocking(move || ensure_mapping(&version, &mappings_dir))
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let ready = tokio::task::spawn_blocking(move || match mtype {
+                MappingType::Yarn => ensure_mapping(&version, &mappings_dir),
+                MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir),
+            })
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
             if !ready {
                 return Ok(DeobfuscateOutcome {
                     text: req.content,
