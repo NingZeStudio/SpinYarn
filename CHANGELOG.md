@@ -2,7 +2,7 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
-## [Unreleased]
+## [v0.3.2] - 2026-08-05
 
 ### 新增
 - **Vanilla（Mojang official mappings）反混淆支持**：
@@ -12,11 +12,26 @@
   - 自动下载扩展：Vanilla 走 Mojang launcher meta（`mappings/vanilla/<version>.txt`，TTL 7 天），与 Yarn 共用版本白名单
   - 缓存共享池 key 改 `version+mapping_type`，存 `Arc<LoadedMappings>`
   - 实测：`at fda.o(SourceFile.java:14)` → `BeeFlyingSoundInstance.getAlternativeSoundInstance`（1.18.2-pre1 自动下载 6.4MB）
+- **映射管理端点**（`src/api/mappings.rs`）：`POST /mappings/load`（Maven 拉取/刷新，原子覆盖）、`POST /mappings/load/local`（本地加载，canonicalize 防路径穿越）、`GET /mappings`（列表）、`GET /mappings/{type}/{version}`（统计）、`DELETE /mappings/{version}`（卸载文件+缓存）
+- **OpenAPI**：`GET /api/v1/openapi.json`（utoipa 4 生成 OpenAPI 3.0，覆盖全部端点）
+- `scripts/download_vanilla_mappings.py`：批量下载 39 个正式版 Vanilla 映射到 `mappings/vanilla/`（增量）
 
 ### 变更
 - LRU 缓存默认水位调整：`max_entries` 32→44、高水位 30→40、低水位 20→30（共享缓存池，为 Vanilla/Fabric 同池缓存预留；水位 30~40 条目 ≈ 300~400MB）
-- 管理端点以映射管理形态回归（`src/api/mappings.rs`）：`/mappings/load`（Maven 拉取/刷新）、`/mappings/load/local`（本地加载，canonicalize 防路径穿越）、`/mappings`（列表）、`/mappings/{type}/{version}`（统计）、`/mappings/{version}`（卸载）；`ApiError` 扩展 `NotFound`/`BadRequest`（404/400）
-- **OpenAPI**：`GET /api/v1/openapi.json`（utoipa 4 生成 OpenAPI 3.0，覆盖全部端点）
+- `ApiError` 扩展 `NotFound`/`BadRequest`（404/400）；`Cache` 增 `remove`
+- 管理端点以映射管理形态回归（v0.2 曾移除）
+
+### 修复
+- `/mappings/load` refresh 先删后下、失败丢旧文件 → 改为 `ensure_*` 加 `force` 参数（跳过 TTL 原子覆盖，失败保留旧文件）
+
+### 测试
+- Vanilla 仿真日志测试（`tests/test_vanilla.rs`：真实 1.21.4 映射裁剪，行号重载/构造器/java.base/透传）与快照回归
+- Sherlock 样本快照回归（`1.21.3` 与参考 `.mapped.txt` 逐行一致、`1.18.2-pre1`）
+- 单测 26 → 52
+
+### 文档
+- `CRCLASH.md` 全面 Code Review 报告
+- `docs/PLAN.md` 已完结移除（扩展计划全部实现）
 
 ## [v0.3.1] - 2026-08-04
 
