@@ -10,8 +10,8 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务（Axum + Tokio）。利�
 - **双映射类型**：请求 `mapping_type` 参数（`yarn` 默认 / `vanilla`）；`src/mapping/dispatcher.rs` 调度机负责按类型加载与分派引擎（`LineEngine` / `VanillaEngine`）。Vanilla 用 TSRG 解析器（`src/mapping/vanilla.rs`），短混淆名只能走结构化堆栈解析（类确认 + TSRG 行号区间定位重载），不适用 residual 正则
 - CPU 密集操作（gzip 解压 + 解析 + 反混淆）放入 `tokio::task::spawn_blocking`，不阻塞 runtime
 - **访问日志中间件**：`tower_http::TraceLayer` 记录每个请求的 method/uri/status/耗时。deobfuscate 走 INFO，health 探针走 DEBUG（避免噪音）
-- 三个端点：`POST /api/v1/deobfuscate`（64MB 上限）、`POST /api/v1/deobfuscate/plain`（成功返回 `text/plain` 完整日志，失败返回 JSON 错误）、`GET /api/v1/health`
-- 管理端点（load/unload/list/version）已在 v2 移除
+- 端点：`POST /api/v1/deobfuscate`（64MB 上限）、`POST /api/v1/deobfuscate/plain`（成功返回 `text/plain`，失败 JSON）、`GET /api/v1/health`；映射管理：`POST /api/v1/mappings/load`（Maven 拉取/刷新）、`POST /api/v1/mappings/load/local`（本地文件加载，路径限 `mappings/` 内防穿越）、`GET /api/v1/mappings`（列出版本）、`GET /api/v1/mappings/{type}/{version}`（统计）、`DELETE /api/v1/mappings/{version}`（卸载文件+缓存）；`GET /api/v1/openapi.json`（utoipa 生成的 OpenAPI 3.0 规范）
+- 管理端点（v0.2 曾移除，v0.4 以映射管理形态回归）
 
 ## 关键约定
 

@@ -115,6 +115,23 @@ curl -X POST /api/v1/deobfuscate/plain \
 { "success": true, "data": { "status": "healthy", "uptime_seconds": 123 } }
 ```
 
+## 映射管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/mappings/load` | 从 Maven/Mojang meta 拉取或刷新指定版本映射（`{version, mapping_type, refresh?}`） |
+| POST | `/api/v1/mappings/load/local` | 从本地路径加载映射（相对 `mappings/` 目录，防路径穿越） |
+| GET | `/api/v1/mappings` | 列出已缓存映射版本（按 yarn/vanilla 分组） |
+| GET | `/api/v1/mappings/{type}/{version}` | 查看某版本映射统计（类/方法/字段数） |
+| DELETE | `/api/v1/mappings/{version}` | 卸载某版本映射（删除本地文件 + 缓存条目） |
+
+```bash
+curl -X POST /api/v1/mappings/load -H 'Content-Type: application/json' \
+  -d '{"version":"1.21.4","mapping_type":"vanilla","refresh":true}'
+```
+
+完整接口规范见 `GET /api/v1/openapi.json`（OpenAPI 3.0）。
+
 ## 支持版本
 
 **无硬编码版本清单**：运行时可反混淆的版本 = 嵌入式映射表（编译期嵌入 43 个版本：1.14 ~ 1.21.11）∪ 外部映射目录中的 `<version>.tiny.gz`。两者都没有的版本**原样透传**（`success: true`，计数为 0）。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。

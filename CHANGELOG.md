@@ -15,6 +15,8 @@
 
 ### 变更
 - LRU 缓存默认水位调整：`max_entries` 32→44、高水位 30→40、低水位 20→30（共享缓存池，为 Vanilla/Fabric 同池缓存预留；水位 30~40 条目 ≈ 300~400MB）
+- 管理端点以映射管理形态回归（`src/api/mappings.rs`）：`/mappings/load`（Maven 拉取/刷新）、`/mappings/load/local`（本地加载，canonicalize 防路径穿越）、`/mappings`（列表）、`/mappings/{type}/{version}`（统计）、`/mappings/{version}`（卸载）；`ApiError` 扩展 `NotFound`/`BadRequest`（404/400）
+- **OpenAPI**：`GET /api/v1/openapi.json`（utoipa 4 生成 OpenAPI 3.0，覆盖全部端点）
 
 ## [v0.3.1] - 2026-08-04
 
