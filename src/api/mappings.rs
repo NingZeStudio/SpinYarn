@@ -51,15 +51,13 @@ pub async fn load_mapping(
     Json(req): Json<LoadRequest>,
 ) -> Result<Json<ApiResponse<LoadedInfo>>, ApiError> {
     let mtype = MappingType::parse(req.mapping_type.as_deref().unwrap_or(""));
-    if req.refresh.unwrap_or(false) {
-        dispatcher::remove_local(&req.version, &state.mappings_dir, mtype);
-    }
+    let force = req.refresh.unwrap_or(false);
 
     let version = req.version.clone();
     let mappings_dir = state.mappings_dir.clone();
     let ready = tokio::task::spawn_blocking(move || match mtype {
-        MappingType::Yarn => ensure_mapping(&version, &mappings_dir),
-        MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir),
+        MappingType::Yarn => ensure_mapping(&version, &mappings_dir, force),
+        MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir, force),
     })
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?

@@ -79,8 +79,8 @@ async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<Deobfuscat
             let version = req.version.clone();
             let mappings_dir = state.mappings_dir.clone();
             let ready = tokio::task::spawn_blocking(move || match mtype {
-                MappingType::Yarn => ensure_mapping(&version, &mappings_dir),
-                MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir),
+                MappingType::Yarn => ensure_mapping(&version, &mappings_dir, false),
+                MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir, false),
             })
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?

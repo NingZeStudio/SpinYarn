@@ -150,17 +150,24 @@ fn download_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLo
 }
 
 /// Ensure a downloadable version's mapping exists locally (respecting the
-/// 7-day TTL). Returns whether the mapping is ready to use.
-pub fn ensure_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLoadError> {
+/// 7-day TTL unless `force`). Returns whether the mapping is ready to use.
+///
+/// Download is atomic (temp file + rename): on failure the previous file is
+/// kept even in `force` mode.
+pub fn ensure_mapping(
+    version: &str,
+    mappings_dir: &str,
+    force: bool,
+) -> Result<bool, MappingLoadError> {
     if !is_valid_version(version) || !is_downloadable_version(version) {
         return Ok(false);
     }
     let path = bundled_path(mappings_dir, version);
-    if path.exists() && mapping_fresh(&path) {
+    if !force && path.exists() && mapping_fresh(&path) {
         tracing::debug!("mapping fresh (cached): {}", version);
         return Ok(true);
     }
-    // Missing or stale: try to (re)download.
+    // Missing, stale or forced: try to (re)download.
     let ok = download_mapping(version, mappings_dir)?;
     if ok {
         return Ok(true);
@@ -238,14 +245,18 @@ fn download_vanilla_mapping(version: &str, mappings_dir: &str) -> Result<bool, M
     Ok(true)
 }
 
-/// Ensure a downloadable Vanilla version's mapping exists locally (7-day TTL).
-/// Returns whether the mapping is ready to use.
-pub fn ensure_vanilla_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLoadError> {
+/// Ensure a downloadable Vanilla version's mapping exists locally (7-day TTL
+/// unless `force`). Returns whether the mapping is ready to use.
+pub fn ensure_vanilla_mapping(
+    version: &str,
+    mappings_dir: &str,
+    force: bool,
+) -> Result<bool, MappingLoadError> {
     if !is_valid_version(version) || !is_downloadable_version(version) {
         return Ok(false);
     }
     let path = vanilla_path(mappings_dir, version);
-    if path.exists() && mapping_fresh(&path) {
+    if !force && path.exists() && mapping_fresh(&path) {
         tracing::debug!("vanilla mapping fresh (cached): {}", version);
         return Ok(true);
     }
