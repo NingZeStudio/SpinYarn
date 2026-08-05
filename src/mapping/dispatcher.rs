@@ -40,6 +40,38 @@ pub enum LoadedMappings {
     Vanilla(Arc<VanillaMappings>),
 }
 
+/// Standard on-disk location of a version's mapping file.
+pub fn local_path(version: &str, mappings_dir: &str, mtype: MappingType) -> std::path::PathBuf {
+    let base = std::path::Path::new(mappings_dir);
+    match mtype {
+        MappingType::Yarn => base.join(format!("{}.tiny.gz", version)),
+        MappingType::Vanilla => base.join("vanilla").join(format!("{}.txt", version)),
+    }
+}
+
+/// Remove the local mapping file for a version/type (used for refresh/unload).
+pub fn remove_local(version: &str, mappings_dir: &str, mtype: MappingType) -> bool {
+    let path = local_path(version, mappings_dir, mtype);
+    match std::fs::remove_file(&path) {
+        Ok(_) => {
+            tracing::info!("mapping removed: {} {}", mtype.as_str(), version);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// Remove local files for both mapping families of a version; returns removed paths.
+pub fn remove_all_local(version: &str, mappings_dir: &str) -> Vec<String> {
+    let mut removed = Vec::new();
+    for mtype in [MappingType::Yarn, MappingType::Vanilla] {
+        if remove_local(version, mappings_dir, mtype) {
+            removed.push(local_path(version, mappings_dir, mtype).to_string_lossy().into_owned());
+        }
+    }
+    removed
+}
+
 /// Whether a mapping for `version` is available locally for the given type.
 pub fn is_supported(version: &str, mappings_dir: &str, mtype: MappingType) -> bool {
     match mtype {

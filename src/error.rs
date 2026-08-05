@@ -4,6 +4,28 @@ use thiserror::Error;
 pub enum ApiError {
     #[error("Internal error: {0}")]
     Internal(String),
+    #[error("Not found: {0}")]
+    NotFound(String),
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+}
+
+impl ApiError {
+    fn code(&self) -> &'static str {
+        match self {
+            ApiError::Internal(_) => "INTERNAL_ERROR",
+            ApiError::NotFound(_) => "NOT_FOUND",
+            ApiError::BadRequest(_) => "BAD_REQUEST",
+        }
+    }
+
+    fn status(&self) -> axum::http::StatusCode {
+        match self {
+            ApiError::Internal(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::NotFound(_) => axum::http::StatusCode::NOT_FOUND,
+            ApiError::BadRequest(_) => axum::http::StatusCode::BAD_REQUEST,
+        }
+    }
 }
 
 impl axum::response::IntoResponse for ApiError {
@@ -11,11 +33,11 @@ impl axum::response::IntoResponse for ApiError {
         let body = axum::Json(serde_json::json!({
             "success": false,
             "error": {
-                "code": "INTERNAL_ERROR",
+                "code": self.code(),
                 "message": self.to_string(),
             }
         }));
 
-        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
+        (self.status(), body).into_response()
     }
 }

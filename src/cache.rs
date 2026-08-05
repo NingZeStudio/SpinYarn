@@ -5,8 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::config::CacheConfig;
 use crate::mapping::dispatcher::LoadedMappings;
 
-/// In-memory LRU cache of parsed mapping sets (Yarn/Vanilla) shared via `Arc`.
-///
+/// In-memory LRU cache of parsed mapping sets (Yarn/Vanilla) shared via `Arc`.///
 /// Bounded by `max_entries`; watermark eviction kicks in once `high_watermark`
 /// entries are held, trimming back to `low_watermark` so the cache oscillates
 /// between the two levels instead of idling at full capacity.
@@ -30,7 +29,7 @@ struct Inner {
     evictions: u64,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct CacheStats {
     pub enabled: bool,
     pub entries: usize,
@@ -121,6 +120,12 @@ impl Cache {
             misses: inner.misses,
             evictions: inner.evictions,
         }
+    }
+
+    /// Remove a version's entry from the cache (e.g. on unload).
+    pub fn remove(&self, version: &str) -> bool {
+        let mut inner = self.inner.lock().unwrap();
+        inner.map.remove(version).is_some()
     }
 }
 

@@ -1,4 +1,4 @@
-use axum::{extract::DefaultBodyLimit, response::Response, Router};
+use axum::{extract::DefaultBodyLimit, response::Response, Json, Router};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -7,13 +7,49 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{debug_span, info_span, Span};
+use utoipa::OpenApi;
 
 use crate::cache::Cache;
 use crate::config::Config;
 
 mod deobfuscate;
 mod health;
+mod mappings;
 mod response;
+
+/// OpenAPI 3.0 document for all endpoints.
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        deobfuscate::handler,
+        deobfuscate::handler_plain,
+        health::handler,
+        mappings::load_mapping,
+        mappings::load_mapping_local,
+        mappings::list_mappings,
+        mappings::mapping_stats,
+        mappings::unload_mapping,
+    ),
+    components(schemas(
+        deobfuscate::DeobfuscateRequest,
+        deobfuscate::DeobfuscateResponse,
+        deobfuscate::DeobfuscateStats,
+        health::HealthResponse,
+        mappings::LoadRequest,
+        mappings::LoadLocalRequest,
+        mappings::LoadedInfo,
+        mappings::MappingsList,
+        mappings::MappingStats,
+        mappings::UnloadInfo,
+        crate::cache::CacheStats,
+    )),
+    info(
+        title = "SpinYarn API",
+        description = "Minecraft 日志反混淆服务：Fabric(Yarn) 与 Vanilla(Mojang official) 映射支持。",
+        version = "0.3.1"
+    )
+)]
+struct ApiDoc;
 
 /// Router-wide state: the deobfuscation concurrency gate, the external
 /// mappings directory, auto-download toggle, and the in-memory mapping cache.
@@ -62,6 +98,11 @@ fn on_response_debug(response: &Response, latency: Duration, span: &Span) {
     );
 }
 
+/// GET /api/v1/openapi.json — OpenAPI 3.0 规范文档。
+async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
+
 pub fn build_router(config: Config) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -87,9 +128,22 @@ pub fn build_router(config: Config) -> Router {
     let deobfuscate_plain_route: axum::routing::MethodRouter<AppState> =
         deobfuscate_plain_route.layer(info_trace.clone());
 
+    let load_route: axum::routing::MethodRouter<AppState> = axum::routing::post(mappings::load_mapping);
+    let load_local_route: axum::routing::MethodRouter<AppState> =
+        axum::routing::post(mappings::load_mapping_local);
+    let list_route: axum::routing::MethodRouter<AppState> = axum::routing::get(mappings::list_mappings);
+    let stats_route: axum::routing::MethodRouter<AppState> = axum::routing::get(mappings::mapping_stats);
+    let unload_route: axum::routing::MethodRouter<AppState> = axum::routing::delete(mappings::unload_mapping);
+
     let api_routes = Router::new()
         .route("/api/v1/deobfuscate", deobfuscate_route)
         .route("/api/v1/deobfuscate/plain", deobfuscate_plain_route)
+        .route("/api/v1/mappings/load", load_route)
+        .route("/api/v1/mappings/load/local", load_local_route)
+        .route("/api/v1/mappings", list_route)
+        .route("/api/v1/mappings/:type/:version", stats_route)
+        .route("/api/v1/mappings/:version", unload_route)
+        .route("/api/v1/openapi.json", axum::routing::get(openapi_json))
         .route(
             "/api/v1/health",
             axum::routing::get(health::handler).layer(debug_trace),

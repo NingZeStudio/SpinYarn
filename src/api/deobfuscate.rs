@@ -5,6 +5,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     api::AppState,
@@ -15,7 +16,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DeobfuscateRequest {
     pub content: String,
     pub version: String,
@@ -24,13 +25,13 @@ pub struct DeobfuscateRequest {
     pub mapping_type: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, ToSchema)]
 pub struct DeobfuscateResponse {
     pub deobfuscated: String,
     pub stats: DeobfuscateStats,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, ToSchema)]
 pub struct DeobfuscateStats {
     pub version: String,
     pub classes_mapped: usize,
@@ -153,6 +154,12 @@ async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<Deobfuscat
     Ok(outcome_from(deobfuscated, req.version))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/deobfuscate",
+    request_body = DeobfuscateRequest,
+    responses((status = 200, body = crate::api::response::ApiResponse<DeobfuscateResponse>))
+)]
 #[axum::debug_handler]
 pub async fn handler(
     State(state): State<AppState>,
@@ -167,6 +174,12 @@ pub async fn handler(
     )))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/deobfuscate/plain",
+    request_body = DeobfuscateRequest,
+    responses((status = 200, content_type = "text/plain"))
+)]
 #[axum::debug_handler]
 pub async fn handler_plain(
     State(state): State<AppState>,
