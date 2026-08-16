@@ -6,6 +6,7 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 
 - **映射外置部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射放在**二进制同级 `./mappings/`** 目录（不嵌入二进制，~6MB），部署时把二者放同一目录即可
 - **自动下载**：请求的 `1.x` 版本不在本地时自动从对应源下载映射（落盘缓存 7 天），新版本/预发布无需改代码
+- **启动引导下载**：`auto_download` 开启且 `mappings/` 目录为空时，后台自动下载 `maven.bootstrap_versions` 清单（默认 1.14~1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射，可配置；无官方映射的版本自动跳过），不阻塞启动
 - **双映射类型**：`mapping_type` 参数支持 Fabric（`yarn`，默认）与 Vanilla（`vanilla`，Mojang official mappings，含行号定位重载）
 - **LRU 热门缓存**：`[cache]` 段启用有界 LRU（默认 44 条目 + 水位线 40/30，共享缓存池），热版本命中跳过加载（~6ms）；实测水位 30~40 条目 ≈ 300~400MB；命中/驱逐/条目数经 `/health` 暴露
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，单版本解析表 ~10MB，不随请求版本数增长
@@ -39,7 +40,7 @@ cp -r mappings target/release/
 
 映射目录默认 = **二进制同级 `./mappings/`**（基于可执行文件路径定位，不依赖工作目录），可用 `maven.mappings_dir` 或 `SPINYARN_MAPPINGS_DIR` 覆盖。配置文件 `config.toml` 同样优先从二进制同级目录查找。
 
-配置可通过 `config.toml`（`server.host`/`server.port`/`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir`/`maven.auto_download`/`cache.*`）配置；`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir` 未配置时分别由环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 兜底。
+配置可通过 `config.toml`（`server.host`/`server.port`/`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir`/`maven.auto_download`/`maven.bootstrap_versions`/`cache.*`）配置；`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir` 未配置时分别由环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 兜底。
 
 ```toml
 [server]
@@ -51,6 +52,7 @@ max_concurrency = 32       # 默认
 [maven]
 mappings_dir = "./mappings"
 auto_download = true       # 缺失版本自动从 Fabric Maven 下载
+# bootstrap_versions = ["1.21.9", "1.21.11"]  # 启动引导下载清单（默认 1.14~1.21.11 共 43 个 Yarn 版本）
 
 [cache]
 enabled = true             # 有界 LRU 缓存

@@ -23,6 +23,12 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      # Mappings are not committed. Unit-test snapshots + integration tests need
+      # a small subset; download only those versions to keep CI fast.
+      - name: Download test mappings
+        run: |
+          bash scripts/download_mappings.sh 1.21.9 1.21.11 1.18.2-pre1 1.21.3 1.21.4 1.14.4
+
       - name: Check
         run: cargo check --all-targets
 

@@ -8,23 +8,38 @@ use spinyarn::mapping::{parse, Mappings};
 
 /// Load mappings from the external `mappings/<version>.tiny.gz` file
 /// (mappings ship alongside the binary / live in the repo root during tests).
-fn load_mappings(version: &str) -> Mappings {
+/// Returns `None` when the file is absent so snapshot tests can skip cleanly
+/// instead of failing on a fresh clone without `scripts/download_mappings.sh`.
+fn load_mappings_opt(version: &str) -> Option<Mappings> {
     let gz_path = format!("mappings/{}.tiny.gz", version);
-    let mut file = std::fs::File::open(&gz_path)
-        .unwrap_or_else(|e| panic!("open {}: {}", gz_path, e));
+    let mut file = std::fs::File::open(&gz_path).ok()?;
     let mut gz = Vec::new();
-    file.read_to_end(&mut gz).unwrap();
+    file.read_to_end(&mut gz).ok()?;
     let mut dec = GzDecoder::new(&gz[..]);
     let mut raw = Vec::new();
-    dec.read_to_end(&mut raw).unwrap();
-    parse(&raw).expect("parse mappings")
+    dec.read_to_end(&mut raw).ok()?;
+    Some(parse(&raw).expect("parse mappings"))
 }
 
 fn deobfuscate_fixture(fixture: &str, version: &str) -> String {
     let content = std::fs::read_to_string(fixture)
         .unwrap_or_else(|e| panic!("read {}: {}", fixture, e));
-    let engine = LineEngine::new(load_mappings(version));
+    let engine = LineEngine::new(load_mappings_opt(version).unwrap());
     engine.deobfuscate(&content).text
+}
+
+/// Skip the test when the external mapping for `version` is missing.
+macro_rules! require_mapping {
+    ($version:expr) => {
+        if load_mappings_opt($version).is_none() {
+            eprintln!(
+                "[skip] mappings/{}.tiny.gz not present; \
+                 run scripts/download_mappings.sh {}",
+                $version, $version
+            );
+            return;
+        }
+    };
 }
 
 /// Compare against a stored snapshot; generate it on first run. Prevents the
@@ -44,12 +59,14 @@ fn assert_snapshot(name: &str, actual: &str) {
 
 #[test]
 fn test_snapshot_crash_1_21_9() {
+    require_mapping!("1.21.9");
     let out = deobfuscate_fixture("tests/fixtures/1.21.9-crash.log", "1.21.9");
     assert_snapshot("1.21.9-crash.log.snap", &out);
 }
 
 #[test]
 fn test_snapshot_fcl_1_21_11() {
+    require_mapping!("1.21.11");
     let out = deobfuscate_fixture("tests/fixtures/1.21.11-fcl.log.txt", "1.21.11");
     assert_snapshot("1.21.11-fcl.log.txt.snap", &out);
 }
@@ -68,6 +85,7 @@ fn test_snapshot_vanilla_1_21_4() {
 #[test]
 fn test_snapshot_sherlock_1_18_2_pre1() {
     // Sherlock 测试样本（Fabric，pre-release）。
+    require_mapping!("1.18.2-pre1");
     let out = deobfuscate_fixture("tests/fixtures/1.18.2-pre1.log", "1.18.2-pre1");
     assert_snapshot("1.18.2-pre1.log.snap", &out);
 }
@@ -75,6 +93,7 @@ fn test_snapshot_sherlock_1_18_2_pre1() {
 #[test]
 fn test_snapshot_sherlock_1_21_3() {
     // Sherlock 测试样本（Fabric crash report）。
+    require_mapping!("1.21.3");
     let out = deobfuscate_fixture("tests/fixtures/1.21.3-crash-report.txt", "1.21.3");
     assert_snapshot("1.21.3-crash-report.txt.snap", &out);
 }

@@ -1,6 +1,7 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use flate2::read::GzDecoder;
 use once_cell::sync::Lazy;
@@ -11,6 +12,22 @@ use crate::mapping::{parse, Mappings};
 /// refresh is attempted.
 const CACHE_TTL: Duration = Duration::from_secs(7 * 24 * 3600);
 const MAVEN_METADATA_URL: &str = "https://maven.fabricmc.net/net/fabricmc/yarn/maven-metadata.xml";
+/// The launcher version manifest and per-version JSONs change rarely; cache the
+/// manifest in-process so a 43-version bootstrap does not refetch it per version.
+const VANILLA_MANIFEST_TTL: Duration = Duration::from_secs(10 * 60);
+
+/// Reusable HTTP agent: keeps a connection pool across downloads instead of
+/// building a fresh agent per request.
+static HTTP_AGENT: Lazy<ureq::Agent> = Lazy::new(|| {
+    ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(20))
+        .build()
+});
+
+/// Cached `version -> version_json_url` entries from the launcher manifest.
+type ManifestEntries = Vec<(String, String)>;
+static VANILLA_MANIFEST_CACHE: Lazy<Mutex<Option<(Instant, ManifestEntries)>>> =
+    Lazy::new(|| Mutex::new(None));
 
 #[derive(Debug, thiserror::Error)]
 pub enum MappingLoadError {
@@ -37,8 +54,9 @@ fn bundled_path(mappings_dir: &str, version: &str) -> PathBuf {
 
 /// A version used in a file path must be a plain Minecraft version token.
 /// Rejects path separators and `..` to prevent path traversal, e.g.
-/// `version = "../../etc/passwd"`.
-fn is_valid_version(version: &str) -> bool {
+/// `version = "../../etc/passwd"`. Call before any path built from a
+/// user-supplied version (API endpoints and the mapping dispatcher).
+pub(crate) fn is_valid_version(version: &str) -> bool {
     let first = version.as_bytes().first();
     !version.is_empty()
         && version.len() <= 64
@@ -110,15 +128,27 @@ fn find_latest_build(version: &str, metadata: &str) -> Option<String> {
     best.map(|(_, full)| full)
 }
 
-/// Fetch a URL into memory with a bounded timeout.
+/// Fetch a URL into memory with a bounded timeout, reusing the pooled agent.
 fn http_get(url: &str) -> Result<Vec<u8>, MappingLoadError> {
-    let agent = ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(20))
-        .build();
-    let resp = agent.get(url).call()?;
+    let resp = HTTP_AGENT.get(url).call()?;
     let mut body = Vec::new();
     resp.into_reader().read_to_end(&mut body)?;
     Ok(body)
+}
+
+/// A unique temporary file path next to `target`, so concurrent downloads of
+/// the same version (e.g. startup bootstrap racing a request) never collide on
+/// the same `.tmp` file. The final artifact is renamed over atomically.
+fn unique_tmp(target: &Path) -> PathBuf {
+    let mut file_name = target.file_name().unwrap_or_default().to_owned();
+    file_name.push(format!(
+        ".tmp.{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    target.with_file_name(file_name)
 }
 
 /// Download the mapping for `version` from Fabric Maven into
@@ -143,7 +173,7 @@ fn download_mapping(version: &str, mappings_dir: &str) -> Result<bool, MappingLo
 
     std::fs::create_dir_all(mappings_dir)?;
     let target = bundled_path(mappings_dir, version);
-    let tmp = target.with_extension("tmp");
+    let tmp = unique_tmp(&target);
     std::fs::write(&tmp, &bytes)?;
     std::fs::rename(&tmp, &target)?;
     Ok(true)
@@ -180,7 +210,10 @@ pub fn ensure_mapping(
         );
         Ok(true)
     } else {
-        tracing::warn!("mapping unavailable: {} (auto-download failed)", version);
+        tracing::error!(
+            "mapping download failed and no stale file to fall back to: {} (auto-download failed)",
+            version
+        );
         Ok(false)
     }
 }
@@ -192,25 +225,95 @@ fn vanilla_path(mappings_dir: &str, version: &str) -> PathBuf {
         .join(format!("{}.txt", version))
 }
 
-/// Locate the Mojang official `client_mappings` URL for a version via the
-/// launcher version manifest.
-fn find_vanilla_mapping_url(version: &str) -> Result<Option<String>, MappingLoadError> {
+/// Whether the mappings directory holds no usable mapping files at all.
+///
+/// Used at startup to decide whether a full bootstrap download should run: the
+/// directory is considered empty when it does not exist, or when it contains
+/// neither any `<version>.tiny.gz` (Yarn) nor any `vanilla/<version>.txt`
+/// (Vanilla). The `vanilla/` subdir is always created on download, so an empty
+/// leftover `vanilla/` alone does not count as populated.
+pub fn mappings_dir_empty(mappings_dir: &str) -> bool {
+    let dir = Path::new(mappings_dir);
+    if !dir.exists() {
+        return true;
+    }
+    let has_yarn = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries.filter_map(Result::ok).any(|e| {
+                e.file_name().to_string_lossy().ends_with(".tiny.gz")
+            })
+        })
+        .unwrap_or(false);
+    if has_yarn {
+        return false;
+    }
+    let vanilla = dir.join("vanilla");
+    if !vanilla.exists() {
+        return true;
+    }
+    let has_vanilla = std::fs::read_dir(&vanilla)
+        .map(|entries| {
+            entries.filter_map(Result::ok).any(|e| {
+                e.file_name().to_string_lossy().ends_with(".txt")
+            })
+        })
+        .unwrap_or(false);
+    !has_vanilla
+}
+
+/// Fetch + parse the launcher version manifest into `(version id, version json
+/// url)` entries.
+fn fetch_launcher_manifest() -> Result<Vec<(String, String)>, MappingLoadError> {
     let manifest: serde_json::Value = serde_json::from_slice(&http_get(
         "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json",
     )?)
     .map_err(|e| MappingLoadError::Parse(e.to_string()))?;
-
-    let version_url = manifest
+    manifest
         .get("versions")
         .and_then(|v| v.as_array())
-        .and_then(|arr| {
-            arr.iter().find(|v| v.get("id").and_then(|s| s.as_str()) == Some(version))
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| {
+                    let id = v.get("id")?.as_str()?.to_string();
+                    let url = v.get("url")?.as_str()?.to_string();
+                    Some((id, url))
+                })
+                .collect()
         })
-        .and_then(|v| v.get("url"))
-        .and_then(|u| u.as_str())
+        .ok_or_else(|| MappingLoadError::Parse("malformed launcher manifest".to_string()))
+}
+
+/// The launcher version manifest entries `(version id, version json url)`,
+/// cached in-process for `VANILLA_MANIFEST_TTL` to avoid one HTTP fetch per
+/// version during a full bootstrap. A poisoned/cleared lock falls back to an
+/// uncached fetch.
+fn launcher_manifest() -> Result<Vec<(String, String)>, MappingLoadError> {
+    let now = Instant::now();
+    let mut cache = match VANILLA_MANIFEST_CACHE.lock() {
+        Ok(guard) => guard,
+        Err(_) => return fetch_launcher_manifest(), // poisoned lock
+    };
+    if let Some((at, entries)) = cache.as_ref() {
+        if at.elapsed() < VANILLA_MANIFEST_TTL {
+            return Ok(entries.clone());
+        }
+    }
+    let entries = fetch_launcher_manifest()?;
+    *cache = Some((now, entries.clone()));
+    Ok(entries)
+}
+
+/// Locate the Mojang official `client_mappings` URL for a version via the
+/// launcher version manifest.
+fn find_vanilla_mapping_url(version: &str) -> Result<Option<String>, MappingLoadError> {
+    let entries = launcher_manifest()?;
+    let version_url = entries
+        .iter()
+        .find(|(id, _)| id == version)
+        .map(|(_, url)| url.clone())
         .ok_or_else(|| MappingLoadError::Parse("version not found in launcher manifest".to_string()))?;
 
-    let version_json: serde_json::Value = serde_json::from_slice(&http_get(version_url)?)
+    let version_json: serde_json::Value = serde_json::from_slice(&http_get(&version_url)?)
         .map_err(|e| MappingLoadError::Parse(e.to_string()))?;
 
     Ok(version_json
@@ -239,7 +342,7 @@ fn download_vanilla_mapping(version: &str, mappings_dir: &str) -> Result<bool, M
     let dir = Path::new(mappings_dir).join("vanilla");
     std::fs::create_dir_all(&dir)?;
     let target = dir.join(format!("{}.txt", version));
-    let tmp = target.with_extension("tmp");
+    let tmp = unique_tmp(&target);
     std::fs::write(&tmp, &bytes)?;
     std::fs::rename(&tmp, &target)?;
     Ok(true)
@@ -265,7 +368,14 @@ pub fn ensure_vanilla_mapping(
         return Ok(true);
     }
     // Download failed; fall back to a stale file if one exists.
-    Ok(path.exists())
+    let stale = path.exists();
+    if !stale {
+        tracing::error!(
+            "vanilla mapping download failed and no stale file to fall back to: {}",
+            version
+        );
+    }
+    Ok(stale)
 }
 
 fn parse_gz(bytes: &[u8]) -> Result<Mappings, MappingLoadError> {
@@ -316,6 +426,28 @@ mod tests {
         for v in ["25w44a", "26.1", "26.1-Snapshot-1", "1.13.2.1", "x1.0"] {
             assert!(!is_downloadable_version(v), "should reject {}", v);
         }
+    }
+
+    #[test]
+    fn test_mappings_dir_empty() {
+        let dir = std::env::temp_dir().join(format!("spinyarn-empty-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        // Non-existent dir is empty.
+        assert!(mappings_dir_empty(dir.to_str().unwrap()));
+        // Empty dir is empty.
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(mappings_dir_empty(dir.to_str().unwrap()));
+        // A Yarn mapping file makes it populated.
+        std::fs::write(dir.join("1.21.9.tiny.gz"), b"x").unwrap();
+        assert!(!mappings_dir_empty(dir.to_str().unwrap()));
+        // Leftover empty vanilla/ alone does not count.
+        std::fs::remove_file(dir.join("1.21.9.tiny.gz")).unwrap();
+        std::fs::create_dir_all(dir.join("vanilla")).unwrap();
+        assert!(mappings_dir_empty(dir.to_str().unwrap()));
+        // A Vanilla mapping file makes it populated.
+        std::fs::write(dir.join("vanilla").join("1.21.9.txt"), b"x").unwrap();
+        assert!(!mappings_dir_empty(dir.to_str().unwrap()));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

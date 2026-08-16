@@ -105,8 +105,36 @@ download_one() {
     return 1
 }
 
+process_version() {
+    local version="$1"
+    local build
+
+    if [[ -f "${MAPPINGS_DIR}/${version}.tiny.gz" ]]; then
+        echo "  [skip] $version already exists"
+        return 2
+    fi
+
+    build=$(find_latest_build "$(echo "$version" | sed 's/\+/%2B/g')")
+    if [[ -z "$build" ]]; then
+        echo "  [FAIL] $version: no build found on Maven"
+        return 1
+    fi
+
+    if download_one "$version" "$build"; then
+        return 0
+    fi
+    return 1
+}
+
+# CLI: pass versions to fetch only those; default is the bundled list.
+if [[ $# -gt 0 ]]; then
+    TARGETS=("$@")
+else
+    TARGETS=("${VERSIONS[@]}")
+fi
+
 echo "=== SpinYarn Mapping Downloader ==="
-echo "Target: ${#VERSIONS[@]} versions"
+echo "Target: ${#TARGETS[@]} versions"
 echo "Output: $MAPPINGS_DIR"
 echo ""
 
@@ -114,22 +142,13 @@ success=0
 failed=0
 skipped=0
 
-for version in "${VERSIONS[@]}"; do
-    if [[ -f "${MAPPINGS_DIR}/${version}.tiny.gz" ]]; then
-        echo "  [skip] $version already exists"
-        ((skipped++))
-        continue
-    fi
-
-    build=$(find_latest_build "$(echo "$version" | sed 's/\+/%2B/g')")
-    if [[ -z "$build" ]]; then
-        echo "  [FAIL] $version: no build found on Maven"
-        ((failed++))
-        continue
-    fi
-
-    if download_one "$version" "$build"; then
+for version in "${TARGETS[@]}"; do
+    process_version "$version"
+    rc=$?
+    if (( rc == 0 )); then
         ((success++))
+    elif (( rc == 2 )); then
+        ((skipped++))
     else
         ((failed++))
     fi

@@ -208,6 +208,21 @@ main() {
         exit 1
     fi
 
+    # The stack/deobfuscation tests need real mappings. Fail loudly instead of
+    # silently passthrough-ing every class (mappings are no longer committed).
+    local missing=0
+    for v in 1.21.4 1.14.4; do
+        if [[ ! -f "mappings/${v}.tiny.gz" ]]; then
+            echo "[✗] Missing mapping: mappings/${v}.tiny.gz"
+            missing=1
+        fi
+    done
+    if [[ $missing -eq 1 ]]; then
+        echo "    Download required Yarn mappings with:"
+        echo "      bash scripts/download_mappings.sh 1.21.4 1.14.4"
+        exit 1
+    fi
+
     start_server
     test_health
     test_deobfuscate_stack
