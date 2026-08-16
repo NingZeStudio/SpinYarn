@@ -46,7 +46,8 @@ mod response;
     info(
         title = "SpinYarn API",
         description = "Minecraft 日志反混淆服务：Fabric(Yarn) 与 Vanilla(Mojang official) 映射支持。",
-        version = "0.3.1"
+        // utoipa's macro only accepts a literal here; keep in sync with Cargo.toml.
+        version = "0.3.2"
     )
 )]
 struct ApiDoc;
@@ -100,7 +101,12 @@ fn on_response_debug(response: &Response, latency: Duration, span: &Span) {
 
 /// GET /api/v1/openapi.json — OpenAPI 3.0 规范文档。
 async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
-    Json(ApiDoc::openapi())
+    let mut api = ApiDoc::openapi();
+    // utoipa's `info(version = ...)` only accepts a literal, so stamp the real
+    // version here at runtime to guarantee it never drifts from Cargo.toml.
+    let info = &mut api.info;
+    info.version = env!("CARGO_PKG_VERSION").to_string();
+    Json(api)
 }
 
 pub fn build_router(config: Config) -> Router {

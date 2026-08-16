@@ -2,7 +2,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ApiError {
-    #[error("Internal error: {0}")]
+    /// Server-side failure; the inner detail is logged but never exposed in the
+    /// response (avoids leaking filesystem paths / implementation details).
+    #[error("{0}")]
     Internal(String),
     #[error("Not found: {0}")]
     NotFound(String),
@@ -26,6 +28,19 @@ impl ApiError {
             ApiError::BadRequest(_) => axum::http::StatusCode::BAD_REQUEST,
         }
     }
+
+    /// Client-facing message: NotFound/BadRequest carry their (already
+    /// sanitized) reason; Internal returns a generic line — the detail goes to
+    /// the logs instead.
+    fn public_message(&self) -> String {
+        match self {
+            ApiError::Internal(detail) => {
+                tracing::error!("internal error: {}", detail);
+                "internal server error".to_string()
+            }
+            ApiError::NotFound(m) | ApiError::BadRequest(m) => m.clone(),
+        }
+    }
 }
 
 impl axum::response::IntoResponse for ApiError {
@@ -34,7 +49,7 @@ impl axum::response::IntoResponse for ApiError {
             "success": false,
             "error": {
                 "code": self.code(),
-                "message": self.to_string(),
+                "message": self.public_message(),
             }
         }));
 

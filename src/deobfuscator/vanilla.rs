@@ -57,6 +57,8 @@ impl VanillaEngine {
             text: out,
             classes_mapped,
             methods_mapped,
+            // Vanilla obfuscated field names are short and not globally unique,
+            // so they cannot be safely rewritten — this count is always 0.
             fields_mapped: 0,
             total_time_ms,
         }

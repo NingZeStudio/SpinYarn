@@ -10,7 +10,20 @@ use crate::api::response::ApiResponse;
 use crate::api::AppState;
 use crate::error::ApiError;
 use crate::mapping::dispatcher::{self, MappingType};
-use crate::mapping::download::{ensure_mapping, ensure_vanilla_mapping};
+use crate::mapping::download::{ensure_mapping, ensure_vanilla_mapping, is_valid_version};
+
+/// Reject a version that would escape the mappings dir when used in a path.
+/// The `dispatcher::local_path` helpers join the version verbatim, so every
+/// user-supplied version must pass the same token validation used by download.
+fn validate_version(version: &str) -> Result<(), ApiError> {
+    if !is_valid_version(version) {
+        return Err(ApiError::BadRequest(format!(
+            "invalid version token: {:?}",
+            version
+        )));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct LoadRequest {
@@ -52,6 +65,7 @@ pub async fn load_mapping(
 ) -> Result<Json<ApiResponse<LoadedInfo>>, ApiError> {
     let mtype = MappingType::parse(req.mapping_type.as_deref().unwrap_or(""));
     let force = req.refresh.unwrap_or(false);
+    validate_version(&req.version)?;
 
     let version = req.version.clone();
     let mappings_dir = state.mappings_dir.clone();
@@ -88,6 +102,7 @@ pub async fn load_mapping_local(
     Json(req): Json<LoadLocalRequest>,
 ) -> Result<Json<ApiResponse<LoadedInfo>>, ApiError> {
     let mtype = MappingType::parse(req.mapping_type.as_deref().unwrap_or(""));
+    validate_version(&req.version)?;
 
     // Resolve + canonicalize inside the mappings dir; reject any traversal.
     let source = safe_local_path(&state.mappings_dir, &req.path)?;
@@ -202,6 +217,7 @@ pub async fn unload_mapping(
     State(state): State<AppState>,
     Path(version): Path<String>,
 ) -> Result<Json<ApiResponse<UnloadInfo>>, ApiError> {
+    validate_version(&version)?;
     let removed_files = dispatcher::remove_all_local(&version, &state.mappings_dir);
     let mut removed_cache = Vec::new();
     if let Some(cache) = &state.cache {
@@ -246,14 +262,12 @@ pub struct UnloadInfo {
 
 /// Resolve a user-supplied local path against the mappings dir and ensure the
 /// canonical result stays inside it (path traversal protection).
+///
+/// Note: no `..` substring precheck — the canonicalize + starts_with guard
+/// below is authoritative and also tolerates legitimate names containing `..`.
 fn safe_local_path(mappings_dir: &str, rel: &str) -> Result<PathBuf, ApiError> {
     if rel.is_empty() {
         return Err(ApiError::BadRequest("path is required".to_string()));
-    }
-    if rel.contains("..") {
-        return Err(ApiError::BadRequest(
-            "path must not contain '..'".to_string(),
-        ));
     }
     let p = FsPath::new(rel);
     if p.is_absolute() {
@@ -275,4 +289,57 @@ fn safe_local_path(mappings_dir: &str, rel: &str) -> Result<PathBuf, ApiError> {
         ));
     }
     Ok(canon)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("spinyarn-api-{}-{}", tag, std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_validate_version_rejects_traversal() {
+        assert!(validate_version("1.21.9").is_ok());
+        assert!(validate_version("1.18.2-pre1").is_ok());
+        assert!(validate_version("../../etc/passwd").is_err());
+        assert!(validate_version("a/b").is_err());
+        assert!(validate_version("..").is_err());
+        assert!(validate_version("").is_err());
+    }
+
+    #[test]
+    fn test_safe_local_path_rejects_traversal() {
+        let dir = tmp_dir("traversal");
+        // A file inside the dir resolves fine.
+        std::fs::write(dir.join("1.21.9.tiny.gz"), b"x").unwrap();
+        let ok = safe_local_path(dir.to_str().unwrap(), "1.21.9.tiny.gz").unwrap();
+        assert!(ok.starts_with(dir.canonicalize().unwrap()));
+
+        // `..` escapes -> rejected.
+        assert!(safe_local_path(dir.to_str().unwrap(), "../escape.tiny.gz").is_err());
+
+        // Absolute path -> rejected.
+        let abs = dir.join("1.21.9.tiny.gz");
+        assert!(safe_local_path(dir.to_str().unwrap(), abs.to_str().unwrap()).is_err());
+
+        // Empty -> rejected.
+        assert!(safe_local_path(dir.to_str().unwrap(), "").is_err());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_safe_local_path_accepts_dotdot_in_name() {
+        // Legitimate filename containing `..` (not a path separator) is allowed.
+        let dir = tmp_dir("dotdot");
+        std::fs::write(dir.join("foo..bar.tiny.gz"), b"x").unwrap();
+        let ok = safe_local_path(dir.to_str().unwrap(), "foo..bar.tiny.gz").unwrap();
+        assert!(ok.starts_with(dir.canonicalize().unwrap()));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

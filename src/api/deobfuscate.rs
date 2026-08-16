@@ -129,7 +129,7 @@ async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<Deobfuscat
     let loaded = tokio::task::spawn_blocking(move || dispatcher::load(&version, &mappings_dir, mtype))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
-        .map_err(ApiError::Internal)?;
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let Some(loaded) = loaded else {
         // Declared supported but no mapping available -> pass through.

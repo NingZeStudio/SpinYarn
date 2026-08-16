@@ -8,18 +8,27 @@ use spinyarn::mapping::{parse, Mappings};
 
 /// Load mappings from the external `mappings/<version>.tiny.gz` file once;
 /// the bench loops only exercise `deobfuscate`, not mapping loading.
-fn load_mappings(version: &str) -> Mappings {
-    let mut file = std::fs::File::open(format!("mappings/{}.tiny.gz", version)).unwrap();
+/// Returns `None` when the file is absent so the bench can exit gracefully on
+/// a fresh clone instead of panicking (mappings are not committed).
+fn load_mappings(version: &str) -> Option<Mappings> {
+    let mut file = std::fs::File::open(format!("mappings/{}.tiny.gz", version)).ok()?;
     let mut gz = Vec::new();
-    file.read_to_end(&mut gz).unwrap();
+    file.read_to_end(&mut gz).ok()?;
     let mut dec = GzDecoder::new(&gz[..]);
     let mut raw = Vec::new();
-    dec.read_to_end(&mut raw).unwrap();
-    parse(&raw).unwrap()
+    dec.read_to_end(&mut raw).ok()?;
+    Some(parse(&raw).expect("parse mappings"))
 }
 
 fn bench_deobfuscate(c: &mut Criterion) {
-    let engine = LineEngine::new(load_mappings("1.21.9"));
+    let Some(mappings) = load_mappings("1.21.9") else {
+        eprintln!(
+            "[skip] mappings/1.21.9.tiny.gz not present; \
+             run scripts/download_mappings.sh 1.21.9 to enable benches"
+        );
+        return;
+    };
+    let engine = LineEngine::new(mappings);
 
     // Pure stack lines: class + method + source-file remap + module prefix strip.
     let stack_line = "\tat knot//net.minecraft.class_310.method_21613(class_310.java:465) ~[client-intermediary.jar:?]\n";

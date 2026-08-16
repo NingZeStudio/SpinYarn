@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::deobfuscator::{DeobfuscateResult, LineEngine, VanillaEngine};
-use crate::mapping::download::{is_version_supported, load_mappings};
+use crate::mapping::download::{is_valid_version, is_version_supported, load_mappings};
 use crate::mapping::vanilla::{is_vanilla_supported, load_vanilla_mappings, VanillaMappings};
 use crate::mapping::Mappings;
 
@@ -50,7 +50,12 @@ pub fn local_path(version: &str, mappings_dir: &str, mtype: MappingType) -> std:
 }
 
 /// Remove the local mapping file for a version/type (used for refresh/unload).
+/// Refuses invalid version tokens (path traversal) regardless of caller.
 pub fn remove_local(version: &str, mappings_dir: &str, mtype: MappingType) -> bool {
+    if !is_valid_version(version) {
+        tracing::warn!("refusing to remove mapping with invalid version: {:?}", version);
+        return false;
+    }
     let path = local_path(version, mappings_dir, mtype);
     match std::fs::remove_file(&path) {
         Ok(_) => {
@@ -80,19 +85,29 @@ pub fn is_supported(version: &str, mappings_dir: &str, mtype: MappingType) -> bo
     }
 }
 
+/// Unified load error for both mapping families (kept structured instead of a
+/// `String` so callers/logs can distinguish the source).
+#[derive(Debug, thiserror::Error)]
+pub enum LoadError {
+    #[error("yarn mapping load: {0}")]
+    Yarn(#[from] crate::mapping::download::MappingLoadError),
+    #[error("vanilla mapping load: {0}")]
+    Vanilla(#[from] crate::mapping::vanilla::VanillaParseError),
+}
+
 /// Load mappings for `version` using the given mapping type.
 pub fn load(
     version: &str,
     mappings_dir: &str,
     mtype: MappingType,
-) -> Result<Option<LoadedMappings>, String> {
+) -> Result<Option<LoadedMappings>, LoadError> {
     match mtype {
         MappingType::Yarn => load_mappings(version, mappings_dir)
             .map(|o| o.map(|m| LoadedMappings::Yarn(Arc::new(m))))
-            .map_err(|e| e.to_string()),
+            .map_err(LoadError::Yarn),
         MappingType::Vanilla => load_vanilla_mappings(version, mappings_dir)
             .map(|o| o.map(|m| LoadedMappings::Vanilla(Arc::new(m))))
-            .map_err(|e| e.to_string()),
+            .map_err(LoadError::Vanilla),
     }
 }
 
@@ -150,5 +165,20 @@ mod tests {
     fn test_parse_tsrg_via_dispatcher_path() {
         let m = parse_tsrg("com.x.Y -> z:\n    0:5:void run() -> q\n").unwrap();
         assert_eq!(m.lookup_method("z", "q", Some(1)), Some("run"));
+    }
+
+    #[test]
+    fn test_remove_local_refuses_traversal() {
+        let dir = tmp_dir("traversal");
+        // A valid version file is removed.
+        std::fs::write(dir.join("1.21.9.tiny.gz"), b"x").unwrap();
+        assert!(remove_local("1.21.9", dir.to_str().unwrap(), MappingType::Yarn));
+        assert!(!dir.join("1.21.9.tiny.gz").exists());
+
+        // A traversal version must be a no-op (and not delete anything).
+        assert!(!remove_local("../../etc/passwd", dir.to_str().unwrap(), MappingType::Yarn));
+        assert!(remove_all_local("..", dir.to_str().unwrap()).is_empty());
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
