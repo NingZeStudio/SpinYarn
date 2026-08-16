@@ -2,6 +2,35 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [v0.3.3] - 2026-08-16
+
+### 新增
+- **映射外置部署**：映射表不再提交进 git（`build.rs`/`embedded.rs` 已移除，二进制 ~6MB），`mappings/` 由 `.gitignore` 忽略，部署时与二进制同级放置
+- **启动引导自动下载**：`maven.auto_download` 开启且 `mappings/` 目录为空时，`main.rs::bootstrap_mappings` 后台任务自动下载 `maven.bootstrap_versions` 清单（默认 1.14~1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射，可配置），不阻塞启动、不占请求路径；无官方映射的版本自动跳过
+- **接入文档**：`docs/API.md`（部署、接口约定、错误码、各端点示例、Python/JS 客户端接入）
+
+### 变更
+- `scripts/download_mappings.sh` 支持命令行传版本参数（只下指定版本），重构出 `process_version` 返回码
+- 复用进程级 `HTTP_AGENT` 连接池；Vanilla manifest 进程内缓存（TTL 10 分钟），43 版本引导从 43 次拉取降为 1 次
+- `dispatcher::load` 改用结构化错误 `LoadError`（Yarn/Vanilla 变体），取代 `String`
+
+### 修复（Code Review 全量修复）
+- **路径穿越漏洞（严重）**：`POST /mappings/load/local` 与 `DELETE /mappings/{version}` 未校验 `version` 令牌，可构造 `../` 逃逸 mappings 目录任意文件写入/删除 → `is_valid_version` 提升 `pub(crate)`，新增 `validate_version` 接入三个管理端点，`dispatcher::remove_local` 与 Vanilla 加载路径二次防御
+- **500 错误详情脱敏**：`ApiError::Internal` 详情仅 `tracing::error!` 记录，响应返回通用文案
+- **OpenAPI 版本号漂移**：运行时以 `env!("CARGO_PKG_VERSION")` 覆盖 `info.version`，根治硬编码
+- **并发下载 `.tmp` 竞争**：`unique_tmp` 纳秒时间戳后缀避免同版本并发覆盖
+- **`safe_local_path` 过度拦截**：移除 `contains("..")` 预检，仅保留 canonicalize 权威校验（兼顾合法 `foo..bar` 文件名）
+- **bench 硬依赖映射**：映射缺失时优雅跳过，不再 panic
+
+### 测试
+- 单测 27 → 31（新增 `validate_version`/`safe_local_path`/`remove_local` 穿越与合法路径回归）
+- 快照测试映射缺失时静默跳过（`require_mapping!`），全新 clone 可直接 `cargo test`
+- CI 新增测试映射下载步骤（只下快照/集成所需 6 版本）；`test.sh` 缺失映射立即报错提示下载命令
+
+### 文档
+- `CRCLASH.md` 全面 Code Review 报告（含修复记录）
+- `AGENTS.md`/`README.md` 同步启动引导下载与配置项说明
+
 ## [v0.3.2] - 2026-08-05
 
 ### 新增

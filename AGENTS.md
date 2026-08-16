@@ -59,4 +59,4 @@ cargo bench             # 基准测试（benches/deobfuscate.rs，引擎吞吐�
 
 - Axum 默认请求体限制 2MB，已通过 `DefaultBodyLimit::max(config.server.max_body_size)`（`src/api/mod.rs::build_router`）放大到 64MB 上限（`src/config.rs::DEFAULT_MAX_BODY_SIZE`），不要缩小
 - `regex` crate 不支持 look-around，边界处理用 `\b` + 前缀边界捕获组
-- OpenAPI 文档版本号在 `src/api/mod.rs::ApiDoc` 的 `info(version=...)` 中**硬编码**（当前 "0.3.1"），更新 `Cargo.toml` 版本时需手动同步，否则 `GET /api/v1/openapi.json` 报旧版本
+- OpenAPI 文档版本号在 `src/api/mod.rs::ApiDoc` 的 `info(version=...)` 中为宏字面量（仅作占位），运行时由 `openapi_json` handler 用 `env!("CARGO_PKG_VERSION")` 覆盖，因此更新 `Cargo.toml` 版本无需手动同步
