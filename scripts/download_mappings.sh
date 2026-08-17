@@ -146,11 +146,11 @@ for version in "${TARGETS[@]}"; do
     process_version "$version"
     rc=$?
     if (( rc == 0 )); then
-        ((success++))
+        (( success += 1 ))
     elif (( rc == 2 )); then
-        ((skipped++))
+        (( skipped += 1 ))
     else
-        ((failed++))
+        (( failed += 1 ))
     fi
 done
 
