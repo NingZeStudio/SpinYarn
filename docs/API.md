@@ -21,7 +21,7 @@ cargo build --release
 
 两种获取方式：
 
-1. **启动自动下载（推荐，默认开启）**：`maven.auto_download = true`（默认）时，若 `mappings/` 目录为空，服务启动后会在后台自动下载 `maven.bootstrap_versions` 清单（默认 1.14 ~ 1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射），不阻塞启动。
+1. **启动自动补全（推荐，默认开启）**：`maven.auto_download = true`（默认）时，服务启动后会在后台按 `maven.bootstrap_versions` 清单（默认 1.14 ~ 1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射）**逐个检查缺失并补全**（目录不存在会自动创建），不阻塞启动。
 2. **脚本预下载**：
    ```bash
    bash scripts/download_mappings.sh            # 下载全部 43 个 Yarn 版本
@@ -33,7 +33,7 @@ cargo build --release
 
 ### 1.3 配置
 
-配置文件查找顺序：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`。均不存在时使用默认值。
+配置文件查找顺序：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`。**均不存在时，首次启动会在二进制同级自动生成默认 `config.toml`**。
 
 ```toml
 [server]
@@ -58,6 +58,7 @@ low_watermark = 30
 
 ```bash
 ./target/release/spinyarn
+# 首次启动会自动：生成 config.toml（若缺失）+ 创建并补全 mappings/（若缺失）
 # 默认监听 127.0.0.1:14523，端口被占用自动递增
 ```
 

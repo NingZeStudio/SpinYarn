@@ -4,9 +4,9 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 
 ## 特性
 
-- **映射外置部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射放在**二进制同级 `./mappings/`** 目录（不嵌入二进制，~6MB），部署时把二者放同一目录即可
+- **映射外置部署**：43 个版本（1.14 ~ 1.21.11）的 Yarn 映射放在**二进制同级 `./mappings/`** 目录（不嵌入二进制，~6MB），首次启动自动创建并补全
 - **自动下载**：请求的 `1.x` 版本不在本地时自动从对应源下载映射（落盘缓存 7 天），新版本/预发布无需改代码
-- **启动引导下载**：`auto_download` 开启且 `mappings/` 目录为空时，后台自动下载 `maven.bootstrap_versions` 清单（默认 1.14~1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射，可配置；无官方映射的版本自动跳过），不阻塞启动
+- **启动引导补全**：`auto_download` 开启时，后台按 `maven.bootstrap_versions` 清单（默认 1.14~1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射，可配置）**逐个检查缺失并补全**（无官方映射的版本自动跳过），不阻塞启动
 - **双映射类型**：`mapping_type` 参数支持 Fabric（`yarn`，默认）与 Vanilla（`vanilla`，Mojang official mappings，含行号定位重载）
 - **LRU 热门缓存**：`[cache]` 段启用有界 LRU（默认 44 条目 + 水位线 40/30，共享缓存池），热版本命中跳过加载（~6ms）；实测水位 30~40 条目 ≈ 300~400MB；命中/驱逐/条目数经 `/health` 暴露
 - **无缓存模型**：按请求版本加载映射、反混淆、用完即弃，单版本解析表 ~10MB，不随请求版本数增长
@@ -22,23 +22,22 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 ### 构建
 
 ```bash
-# 1. 下载映射表到 mappings/（部署时随二进制携带）
-bash scripts/download_mappings.sh
-
-# 2. 编译（~6MB 二进制）
+# 编译（~6MB 二进制）
 cargo build --release
 ```
 
 ### 部署与运行
 
 ```bash
-# 把映射放到二进制同级目录，二者一起部署
-cp -r mappings target/release/
+# 直接运行即可，无需预先准备映射或配置文件：
 ./target/release/spinyarn
+# 首次启动会自动：
+#   1. 在二进制同级生成 config.toml（若不存在）
+#   2. 自动创建 mappings/ 并按 bootstrap_versions 清单逐个补全缺失的映射（Yarn + Vanilla）
 # 默认监听 127.0.0.1:14523；端口被占用时自动 +1 递增直至找到空闲端口
 ```
 
-映射目录默认 = **二进制同级 `./mappings/`**（基于可执行文件路径定位，不依赖工作目录），可用 `maven.mappings_dir` 或 `SPINYARN_MAPPINGS_DIR` 覆盖。配置文件 `config.toml` 同样优先从二进制同级目录查找。
+映射目录默认 = **二进制同级 `./mappings/`**（基于可执行文件路径定位，不依赖工作目录），可用 `maven.mappings_dir` 或 `SPINYARN_MAPPINGS_DIR` 覆盖。配置文件 `config.toml` 同样优先从二进制同级目录查找（不存在时自动生成默认配置）。
 
 配置可通过 `config.toml`（`server.host`/`server.port`/`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir`/`maven.auto_download`/`maven.bootstrap_versions`/`cache.*`）配置；`server.max_body_size`/`server.max_concurrency`/`maven.mappings_dir` 未配置时分别由环境变量 `SPINYARN_MAX_CONCURRENCY`/`SPINYARN_MAPPINGS_DIR` 兜底。
 
@@ -96,7 +95,7 @@ low_watermark = 30         # 淘汰到该水位
 ```
 
 行为：
-- 版本在内置 43 个列表且映射可用 → 正常反混淆
+- 版本映射本地可用（或 `auto_download` 可下载）→ 正常反混淆
 - 否则 → **原样透传**（`success: true`，计数为 0）
 
 ### `POST /api/v1/deobfuscate/plain`
@@ -136,7 +135,7 @@ curl -X POST /api/v1/mappings/load -H 'Content-Type: application/json' \
 
 ## 支持版本
 
-**无硬编码版本清单**：运行时可反混淆的版本 = 嵌入式映射表（编译期嵌入 43 个版本：1.14 ~ 1.21.11）∪ 外部映射目录中的 `<version>.tiny.gz`。两者都没有的版本**原样透传**（`success: true`，计数为 0）。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。
+**无硬编码版本清单**：运行时可反混淆的版本 = 外部映射目录 `mappings/<version>.tiny.gz`（含 `auto_download` 自动下载的版本）。没有映射的版本**原样透传**（`success: true`，计数为 0）。往映射目录新增版本文件（含 pre-release）无需改代码即自动生效。
 
 ## 性能（Termux arm64，release 实测）
 

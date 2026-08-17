@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Default request body limit (64MB).
@@ -14,7 +14,7 @@ fn exe_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct Config {
     #[serde(default)]
     pub server: ServerConfig,
@@ -24,7 +24,7 @@ pub struct Config {
     pub cache: CacheConfig,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServerConfig {
     #[serde(default = "default_host")]
     pub host: String,
@@ -36,7 +36,7 @@ pub struct ServerConfig {
     pub max_concurrency: usize,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MavenConfig {
     #[serde(default = "default_mappings_dir")]
     pub mappings_dir: String,
@@ -105,7 +105,7 @@ fn default_bootstrap_versions() -> Vec<String> {
 }
 
 /// In-memory LRU cache of parsed mappings with watermark eviction.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CacheConfig {
     #[serde(default = "default_cache_enabled")]
     pub enabled: bool,
@@ -190,7 +190,26 @@ impl Config {
             }
         }
 
+        // No config file found: write a default config next to the executable
+        // so first-run operators get a visible, editable starting point.
+        let default = Self::default();
+        let target = &config_paths[0];
+        match toml::to_string_pretty(&default) {
+            Ok(content) => {
+                if let Err(e) = std::fs::write(target, content) {
+                    tracing::warn!(
+                        "failed to write default config to {}: {}",
+                        target.display(),
+                        e
+                    );
+                } else {
+                    tracing::info!("no config found, generated default at {}", target.display());
+                }
+            }
+            Err(e) => tracing::warn!("failed to serialize default config: {}", e),
+        }
+
         tracing::info!("No config file found, using defaults");
-        Self::default()
+        default
     }
 }

@@ -225,42 +225,6 @@ fn vanilla_path(mappings_dir: &str, version: &str) -> PathBuf {
         .join(format!("{}.txt", version))
 }
 
-/// Whether the mappings directory holds no usable mapping files at all.
-///
-/// Used at startup to decide whether a full bootstrap download should run: the
-/// directory is considered empty when it does not exist, or when it contains
-/// neither any `<version>.tiny.gz` (Yarn) nor any `vanilla/<version>.txt`
-/// (Vanilla). The `vanilla/` subdir is always created on download, so an empty
-/// leftover `vanilla/` alone does not count as populated.
-pub fn mappings_dir_empty(mappings_dir: &str) -> bool {
-    let dir = Path::new(mappings_dir);
-    if !dir.exists() {
-        return true;
-    }
-    let has_yarn = std::fs::read_dir(dir)
-        .map(|entries| {
-            entries.filter_map(Result::ok).any(|e| {
-                e.file_name().to_string_lossy().ends_with(".tiny.gz")
-            })
-        })
-        .unwrap_or(false);
-    if has_yarn {
-        return false;
-    }
-    let vanilla = dir.join("vanilla");
-    if !vanilla.exists() {
-        return true;
-    }
-    let has_vanilla = std::fs::read_dir(&vanilla)
-        .map(|entries| {
-            entries.filter_map(Result::ok).any(|e| {
-                e.file_name().to_string_lossy().ends_with(".txt")
-            })
-        })
-        .unwrap_or(false);
-    !has_vanilla
-}
-
 /// Fetch + parse the launcher version manifest into `(version id, version json
 /// url)` entries.
 fn fetch_launcher_manifest() -> Result<Vec<(String, String)>, MappingLoadError> {
@@ -370,8 +334,8 @@ pub fn ensure_vanilla_mapping(
     // Download failed; fall back to a stale file if one exists.
     let stale = path.exists();
     if !stale {
-        tracing::error!(
-            "vanilla mapping download failed and no stale file to fall back to: {}",
+        tracing::warn!(
+            "vanilla mapping unavailable (no official Mojang mapping for this version): {}",
             version
         );
     }
@@ -426,28 +390,6 @@ mod tests {
         for v in ["25w44a", "26.1", "26.1-Snapshot-1", "1.13.2.1", "x1.0"] {
             assert!(!is_downloadable_version(v), "should reject {}", v);
         }
-    }
-
-    #[test]
-    fn test_mappings_dir_empty() {
-        let dir = std::env::temp_dir().join(format!("spinyarn-empty-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        // Non-existent dir is empty.
-        assert!(mappings_dir_empty(dir.to_str().unwrap()));
-        // Empty dir is empty.
-        std::fs::create_dir_all(&dir).unwrap();
-        assert!(mappings_dir_empty(dir.to_str().unwrap()));
-        // A Yarn mapping file makes it populated.
-        std::fs::write(dir.join("1.21.9.tiny.gz"), b"x").unwrap();
-        assert!(!mappings_dir_empty(dir.to_str().unwrap()));
-        // Leftover empty vanilla/ alone does not count.
-        std::fs::remove_file(dir.join("1.21.9.tiny.gz")).unwrap();
-        std::fs::create_dir_all(dir.join("vanilla")).unwrap();
-        assert!(mappings_dir_empty(dir.to_str().unwrap()));
-        // A Vanilla mapping file makes it populated.
-        std::fs::write(dir.join("vanilla").join("1.21.9.txt"), b"x").unwrap();
-        assert!(!mappings_dir_empty(dir.to_str().unwrap()));
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

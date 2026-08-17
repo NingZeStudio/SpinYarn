@@ -4,7 +4,7 @@
 > 审查范围：`src/`（19 文件，约 3060 行）、`tests/`（4 文件）、`benches/`（1 文件）Rust 源码；配置（Cargo.toml、test.sh、scripts/、.github/workflows、docs/）
 > 排除：`target/`、`.git/`、`mappings/`（已移出 git，运行时下载）
 > 技术栈：Rust 2021 + Axum 0.7 + Tokio 1；serde/serde_json、tower-http、regex、tracing、flate2、ureq、utoipa、criterion
-> 版本：v0.3.3（工作区干净，基于上一轮 CR 修复后的最终提交）
+> 版本：v0.3.4（工作区干净，基于上一轮 CR 修复后的最终提交）
 
 ---
 

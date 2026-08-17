@@ -2,6 +2,22 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [v0.3.4] - 2026-08-17
+
+### 新增
+- **首次启动自动生成配置**：`Config::load()` 找不到任何配置文件时，在二进制同级自动生成默认 `config.toml`（`toml::to_string_pretty` 序列化默认值，写失败仅 warn 不 panic）
+- **启动引导补全**：`bootstrap_mappings` 从"目录全空才下载"改为按 `maven.bootstrap_versions` 清单**逐个检查缺失、缺哪个补哪个**（`ensure_one` 分别检查 Yarn/`Vanilla` 文件，存在即跳过；目录不存在自动创建），双家族都补，不阻塞启动
+- `Config`/`ServerConfig`/`MavenConfig`/`CacheConfig` 增加 `Serialize` derive
+
+### 变更
+- Release 制品不再打包 `mappings/`（映射由二进制首次启动时自动补全），移除 `release.yml` 中 `cp -r mappings dist/mappings`
+
+### 修复
+- **下载脚本 CI 失败**：`set -e` 下 `((success++))` 后缀递增返回旧值 0 触发退出，改为 `(( success += 1 ))`（含 skipped/failed）
+
+### 文档
+- `README.md`/`AGENTS.md`/`docs/API.md` 同步"首次启动自动生成配置 + 逐版本补全映射"的部署语义
+
 ## [v0.3.3] - 2026-08-16
 
 ### 新增

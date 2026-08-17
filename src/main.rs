@@ -1,54 +1,52 @@
 use spinyarn::api::build_router;
 use spinyarn::config::Config;
-use spinyarn::mapping::download::{ensure_mapping, ensure_vanilla_mapping, mappings_dir_empty};
+use spinyarn::mapping::dispatcher::{self, MappingType};
+use spinyarn::mapping::download::{ensure_mapping, ensure_vanilla_mapping};
 use spinyarn::START_TIME;
+use std::path::Path;
 use std::sync::atomic::Ordering;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Spawn a background bootstrap download of the configured version list (both
-/// Yarn and Vanilla families) when `maven.auto_download` is on and the
-/// mappings directory is empty. Runs off the request path; the server keeps
-/// serving while it fills in. Vanilla is skipped for versions without official
-/// mappings (e.g. 1.14.3 and earlier) by `ensure_vanilla_mapping`.
+/// Ensure a mapping file exists locally, downloading it if missing (both Yarn
+/// and Vanilla families). Runs inside a `spawn_blocking` task; missing files
+/// are backfilled, existing ones are left untouched.
+fn ensure_one(version: &str, mappings_dir: &str) {
+    let yarn = dispatcher::local_path(version, mappings_dir, MappingType::Yarn);
+    if !Path::new(&yarn).exists() {
+        match ensure_mapping(version, mappings_dir, false) {
+            Ok(true) => tracing::info!("bootstrap: {} yarn ready", version),
+            _ => tracing::warn!("bootstrap: {} yarn failed or unsupported", version),
+        }
+    }
+
+    let vanilla = dispatcher::local_path(version, mappings_dir, MappingType::Vanilla);
+    if !Path::new(&vanilla).exists() {
+        match ensure_vanilla_mapping(version, mappings_dir, false) {
+            Ok(true) => tracing::info!("bootstrap: {} vanilla ready", version),
+            Ok(false) => tracing::debug!("bootstrap: {} vanilla unavailable (no official mapping)", version),
+            Err(e) => tracing::warn!("bootstrap: {} vanilla failed: {}", version, e),
+        }
+    }
+}
+
+/// Spawn a background bootstrap that backfills every missing mapping from the
+/// configured version list (both Yarn and Vanilla families) when
+/// `maven.auto_download` is on. Runs off the request path; the server keeps
+/// serving while it fills in.
 fn bootstrap_mappings(config: &Config) {
     if !config.maven.auto_download {
-        return;
-    }
-    if !mappings_dir_empty(&config.maven.mappings_dir) {
-        tracing::debug!("mappings dir already populated, skipping bootstrap");
         return;
     }
     let versions = config.maven.bootstrap_versions.clone();
     let mappings_dir = config.maven.mappings_dir.clone();
     tokio::spawn(async move {
-        tracing::info!(
-            "bootstrap: mappings dir empty, downloading {} version(s)",
-            versions.len()
-        );
+        tracing::info!("bootstrap: checking {} version(s)", versions.len());
         for version in versions {
             let dir = mappings_dir.clone();
             let v = version.clone();
-            let yarn = tokio::task::spawn_blocking(move || ensure_mapping(&v, &dir, false))
+            tokio::task::spawn_blocking(move || ensure_one(&v, &dir))
                 .await
-                .ok()
-                .and_then(|r| r.ok())
-                .unwrap_or(false);
-            let dir = mappings_dir.clone();
-            let v = version.clone();
-            let vanilla =
-                tokio::task::spawn_blocking(move || ensure_vanilla_mapping(&v, &dir, false))
-                    .await
-                    .ok()
-                    .and_then(|r| r.ok())
-                    .unwrap_or(false);
-            if yarn {
-                tracing::info!("bootstrap: {} yarn ready", version);
-            } else {
-                tracing::warn!("bootstrap: {} yarn failed or unsupported", version);
-            }
-            if vanilla {
-                tracing::info!("bootstrap: {} vanilla ready", version);
-            }
+                .ok();
         }
         tracing::info!("bootstrap: done");
     });
