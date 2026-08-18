@@ -81,18 +81,29 @@ pub extern "C" fn spinyarn_init(
 /// # Safety
 /// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
 /// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). `auto_download` is 0/1.
-/// `cache_max_entries`: 0 = disable the LRU cache; a positive value caps the
-/// cache at that many entries.
+///
+/// Full MySQLi-style positional config:
+/// - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps the
+///   cache at that many entries.
+/// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from the
+///   cap); otherwise used verbatim.
 #[no_mangle]
-pub extern "C" fn spinyarn_init_ext(
+pub extern "C" fn spinyarn_init_full(
     mappings_dir: *const c_char,
     auto_download: c_int,
     cache_max_entries: usize,
+    cache_high_watermark: usize,
+    cache_low_watermark: usize,
 ) -> *mut spinyarn_handle {
     let result = catch_unwind(AssertUnwindSafe(|| {
         let dir = resolve_dir(mappings_dir);
-        let inner =
-            Spinyarn::from_settings_with_cache(&dir, auto_download != 0, cache_max_entries);
+        let inner = Spinyarn::from_full_settings(
+            &dir,
+            auto_download != 0,
+            cache_max_entries,
+            cache_high_watermark,
+            cache_low_watermark,
+        );
         Box::into_raw(Box::new(spinyarn_handle { inner }))
     }));
     match result {

@@ -49,28 +49,41 @@ static spinyarn_handle_t *fetch_handle(zval *z)
  * --------------------------------------------------------------------- */
 
 /* spinyarn_init(?string $mappings_dir = null, bool $auto_download = true,
- *               int $cache_max_entries = 0): resource */
+ *               int $cache_max_entries = 44, int $cache_high_watermark = 40,
+ *               int $cache_low_watermark = 30): resource */
 PHP_FUNCTION(spinyarn_init)
 {
     zend_string *mappings_dir = NULL;
     bool auto_download = true;
-    zend_long cache_max_entries = 0;
+    zend_long cache_max_entries = 44;
+    zend_long cache_high_watermark = 40;
+    zend_long cache_low_watermark = 30;
 
-    ZEND_PARSE_PARAMETERS_START(0, 3)
+    ZEND_PARSE_PARAMETERS_START(0, 5)
         Z_PARAM_OPTIONAL
         Z_PARAM_STR_OR_NULL(mappings_dir)
         Z_PARAM_BOOL(auto_download)
         Z_PARAM_LONG(cache_max_entries)
+        Z_PARAM_LONG(cache_high_watermark)
+        Z_PARAM_LONG(cache_low_watermark)
     ZEND_PARSE_PARAMETERS_END();
 
     if (cache_max_entries < 0) {
         cache_max_entries = 0;
     }
+    if (cache_high_watermark < 0) {
+        cache_high_watermark = 0;
+    }
+    if (cache_low_watermark < 0) {
+        cache_low_watermark = 0;
+    }
 
-    spinyarn_handle_t *handle = spinyarn_init_ext(
+    spinyarn_handle_t *handle = spinyarn_init_full(
         mappings_dir ? ZSTR_VAL(mappings_dir) : NULL,
         auto_download ? 1 : 0,
-        (size_t)cache_max_entries);
+        (size_t)cache_max_entries,
+        (size_t)cache_high_watermark,
+        (size_t)cache_low_watermark);
     if (handle == NULL) {
         php_error_docref(NULL, E_WARNING, "failed to initialize Spinyarn");
         RETURN_FALSE;
@@ -197,6 +210,8 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_init, 0, 0, 0)
     ZEND_ARG_TYPE_INFO(0, mappings_dir, IS_STRING, 1)
     ZEND_ARG_TYPE_INFO(0, auto_download, _IS_BOOL, 1)
     ZEND_ARG_TYPE_INFO(0, cache_max_entries, IS_LONG, 1)
+    ZEND_ARG_TYPE_INFO(0, cache_high_watermark, IS_LONG, 1)
+    ZEND_ARG_TYPE_INFO(0, cache_low_watermark, IS_LONG, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_deobfuscate, 0, 0, 3)

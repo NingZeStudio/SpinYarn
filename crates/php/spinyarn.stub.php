@@ -3,25 +3,26 @@
 /** @generate-class-entries */
 
 /**
- * Initialize a SpinYarn engine handle.
+ * Initialize a SpinYarn engine handle (MySQLi-style positional config).
  *
- * No config file: the mappings directory and auto-download toggle are passed
- * directly. The engine is released automatically when the returned resource is
- * garbage-collected (no manual free needed).
+ * No config file: all settings are passed positionally. The engine is released
+ * automatically when the returned resource is garbage-collected (no manual free
+ * needed).
  *
- * @param string|null $mappings_dir    Directory holding the mapping files; NULL
- *                                     falls back to SPINYARN_MAPPINGS_DIR or the
- *                                     host executable's ./mappings.
- * @param bool $auto_download          Download missing mappings on demand (1.x
- *                                     series only; snapshots/26.x excluded).
- * @param int  $cache_max_entries      0 = disable the LRU cache; a positive value
- *                                     caps it at that many entries. Defaults to 0
- *                                     (built-in bounded cache). Use a small value
- *                                     or 0 in PHP-FPM multi-worker setups to bound
- *                                     per-process memory.
- * @return resource|false              Engine handle resource, or false on failure.
+ * @param string|null $mappings_dir       Directory holding the mapping files; NULL
+ *                                        falls back to SPINYARN_MAPPINGS_DIR or the
+ *                                        host executable's ./mappings.
+ * @param bool $auto_download             Download missing mappings on demand (1.x
+ *                                        series only; snapshots/26.x excluded).
+ * @param int  $cache_max_entries         0 = disable the LRU cache; a positive value
+ *                                        caps it at that many entries. Default 44.
+ * @param int  $cache_high_watermark      High watermark for batch eviction; 0 = auto
+ *                                        (derived from the cap). Default 40.
+ * @param int  $cache_low_watermark       Low watermark to evict down to; 0 = auto.
+ *                                        Default 30.
+ * @return resource|false                 Engine handle resource, or false on failure.
  */
-function spinyarn_init(?string $mappings_dir = null, bool $auto_download = true, int $cache_max_entries = 0) {}
+function spinyarn_init(?string $mappings_dir = null, bool $auto_download = true, int $cache_max_entries = 44, int $cache_high_watermark = 40, int $cache_low_watermark = 30) {}
 
 /**
  * Deobfuscate a log's stack traces.

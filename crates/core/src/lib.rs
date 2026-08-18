@@ -38,9 +38,10 @@ pub struct DeobfuscateOutput {
 }
 
 impl Spinyarn {
-    /// Build an engine from a loaded [`config::Config`].
+    /// Build an engine from a loaded [`config::Config`], honouring every cache
+    /// field (bound + watermarks) exactly as configured.
     pub fn new(config: &config::Config) -> Self {
-        Self::from_settings_with_cache(
+        Self::from_full_settings(
             &config.maven.mappings_dir,
             config.maven.auto_download,
             if config.cache.enabled {
@@ -48,37 +49,57 @@ impl Spinyarn {
             } else {
                 0
             },
+            config.cache.high_watermark,
+            config.cache.low_watermark,
         )
     }
 
     /// Build an engine from explicit settings (no config file), with the
-    /// default LRU cache configuration. Used by the C ABI.
+    /// default LRU cache configuration. Used by the C ABI's short init.
     pub fn from_settings(mappings_dir: &str, auto_download: bool) -> Self {
-        Self::from_settings_with_cache(
+        let d = config::CacheConfig::default();
+        Self::from_full_settings(
             mappings_dir,
             auto_download,
-            config::CacheConfig::default().max_entries,
+            d.max_entries,
+            d.high_watermark,
+            d.low_watermark,
         )
     }
 
-    /// Build an engine from explicit settings with a custom cache bound.
-    /// `cache_max_entries == 0` disables the LRU cache entirely; otherwise it
-    /// caps the cache at `cache_max_entries` entries (watermarks scale with the
-    /// cap). Lets embedding hosts (PHP-FPM workers) trade memory for hit rate.
-    pub fn from_settings_with_cache(
+    /// Build an engine from the full explicit settings set (no config file),
+    /// MySQLi-style positional configuration.
+    ///
+    /// - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps
+    ///   the cache at that many entries.
+    /// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from
+    ///   the cap); otherwise the explicit watermark values are used.
+    pub fn from_full_settings(
         mappings_dir: &str,
         auto_download: bool,
         cache_max_entries: usize,
+        cache_high_watermark: usize,
+        cache_low_watermark: usize,
     ) -> Self {
         let cache = if cache_max_entries == 0 {
             None
         } else {
-            let mut cfg = config::CacheConfig::default();
-            if cache_max_entries != cfg.max_entries {
-                cfg.max_entries = cache_max_entries;
-                cfg.high_watermark = cache_max_entries.max(1);
-                cfg.low_watermark = (cache_max_entries * 3 / 4).max(1);
-            }
+            let high_watermark = if cache_high_watermark == 0 {
+                cache_max_entries.max(1)
+            } else {
+                cache_high_watermark
+            };
+            let low_watermark = if cache_low_watermark == 0 {
+                (cache_max_entries * 3 / 4).max(1)
+            } else {
+                cache_low_watermark
+            };
+            let cfg = config::CacheConfig {
+                enabled: true,
+                max_entries: cache_max_entries,
+                high_watermark,
+                low_watermark,
+            };
             Some(Arc::new(cache::Cache::new(cfg)))
         };
         Spinyarn {
@@ -248,18 +269,26 @@ mod tests {
     use std::io::Write;
 
     #[test]
-    fn test_from_settings_with_cache_disabled() {
-        let s = Spinyarn::from_settings_with_cache("/tmp", false, 0);
+    fn test_from_full_settings_cache_disabled() {
+        let s = Spinyarn::from_full_settings("/tmp", false, 0, 0, 0);
         assert!(s.cache.is_none());
     }
 
     #[test]
-    fn test_from_settings_with_cache_custom_bound() {
-        let s = Spinyarn::from_settings_with_cache("/tmp", false, 8);
+    fn test_from_full_settings_custom_bound() {
+        let s = Spinyarn::from_full_settings("/tmp", false, 8, 8, 4);
         let cache = s.cache.as_ref().expect("cache enabled");
         let stats = cache.stats();
         assert!(stats.enabled);
-        // entry count is 0; the bound is enforced on insert (see cache tests)
+    }
+
+    #[test]
+    fn test_from_full_settings_auto_watermarks() {
+        // high=0, low=0 -> derived from the cap (high = cap, low = 3/4 cap).
+        let s = Spinyarn::from_full_settings("/tmp", false, 10, 0, 0);
+        let cache = s.cache.as_ref().expect("cache enabled");
+        let stats = cache.stats();
+        assert!(stats.enabled);
     }
 
     #[test]

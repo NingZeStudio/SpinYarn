@@ -61,9 +61,10 @@ gcc -shared -fPIC -O2 -DCOMPILE_DL_SPINYARN $(php-config --includes) \
 加载与调用（运行时需 `LD_LIBRARY_PATH` 指向 cdylib）：
 
 ```php
-// 无需配置文件：直接传映射目录 + 是否自动下载（+ 可选缓存上限）
-$handle = spinyarn_init(__DIR__ . '/mappings', true);        // 默认缓存
-$handle = spinyarn_init(__DIR__ . '/mappings', true, 0);     // 禁用 LRU 缓存
+// MySQLi 风格位置参数：映射目录、自动下载、缓存上限、高水位、低水位
+$handle = spinyarn_init(__DIR__ . '/mappings', true);              // 默认缓存 (44/40/30)
+$handle = spinyarn_init(__DIR__ . '/mappings', true, 10, 8, 5);    // 自定义缓存水位
+$handle = spinyarn_init(__DIR__ . '/mappings', true, 0);           // 禁用 LRU 缓存
 $r = spinyarn_deobfuscate($handle, $log, '1.21.9', SPINYARN_YARN);
 // $r = ['deobfuscated' => ..., 'classes_mapped' => 1, 'methods_mapped' => 1, ...]
 ```

@@ -35,18 +35,25 @@ _Static_assert(SPINYARN_YARN == 0 && SPINYARN_VANILLA == 1,
  * - `mappings_dir`: directory holding the mapping files. Pass NULL to fall back
  *   to SPINYARN_MAPPINGS_DIR or <exe>/mappings.
  * - `auto_download`: 1 to download missing mappings on demand, 0 to disable.
+ * Uses the default LRU cache bound.
  * Returns NULL on failure.
  */
 spinyarn_handle_t *spinyarn_init(const char *mappings_dir, int auto_download);
 
 /*
- * Same as spinyarn_init, but lets the host control the LRU cache.
- * - `cache_max_entries`: 0 = disable the cache; a positive value caps it at
- *   that many entries. Use this from PHP-FPM-style multi-worker hosts to bound
- *   per-process memory.
+ * Full MySQLi-style positional configuration (no config file).
+ * - `mappings_dir`: directory holding the mapping files (NULL = default).
+ * - `auto_download`: 1 = download missing mappings on demand, 0 = disable.
+ * - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps it at
+ *   that many entries.
+ * - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from the
+ *   cap); otherwise used verbatim.
+ * Returns NULL on failure.
  */
-spinyarn_handle_t *spinyarn_init_ext(const char *mappings_dir, int auto_download,
-                                     size_t cache_max_entries);
+spinyarn_handle_t *spinyarn_init_full(const char *mappings_dir, int auto_download,
+                                      size_t cache_max_entries,
+                                      size_t cache_high_watermark,
+                                      size_t cache_low_watermark);
 
 /* Release the engine and all associated resources. */
 void spinyarn_free(spinyarn_handle_t *handle);
