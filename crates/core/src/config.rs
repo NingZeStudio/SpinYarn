@@ -213,3 +213,44 @@ impl Config {
         default
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Guard against the `bootstrap_versions` list drifting from the download
+    /// script's `VERSIONS` array. Both are the source of truth for the default
+    /// startup bootstrap set; this test keeps them in sync.
+    #[test]
+    fn test_bootstrap_versions_match_download_script() {
+        let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/download_mappings.sh");
+        let content = match std::fs::read_to_string(&script) {
+            Ok(c) => c,
+            Err(_) => return, // script not present (e.g. packaged without scripts)
+        };
+
+        // Extract every quoted version token from the VERSIONS=(...) block.
+        let re = regex::Regex::new(r#""(1\.\d+(?:\.\d+)?)""#).unwrap();
+        let script_versions: Vec<String> = re
+            .captures_iter(&content)
+            .map(|c| c[1].to_string())
+            .collect();
+
+        let rust_versions = default_bootstrap_versions();
+        assert_eq!(
+            script_versions.len(),
+            rust_versions.len(),
+            "script VERSIONS count ({}) != bootstrap_versions count ({})",
+            script_versions.len(),
+            rust_versions.len()
+        );
+        for v in &rust_versions {
+            assert!(
+                script_versions.contains(v),
+                "bootstrap version {} missing from download_mappings.sh",
+                v
+            );
+        }
+    }
+}

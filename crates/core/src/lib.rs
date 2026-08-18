@@ -9,7 +9,7 @@ pub mod mapping;
 use std::sync::Arc;
 
 use deobfuscator::DeobfuscateResult;
-use mapping::dispatcher::{self, MappingType};
+use mapping::dispatcher::{self, LoadedMappings, MappingType};
 use mapping::download::{
     ensure_mapping, ensure_vanilla_mapping, is_downloadable_version, MappingLoadError,
 };
@@ -18,7 +18,9 @@ use mapping::download::{
 ///
 /// Owns the mappings directory, auto-download toggle, and (optionally) the LRU
 /// cache. This is the synchronous facade used by both the C ABI and any other
-/// embedding host (the Axum binary layers async/HTTP concerns on top).
+/// embedding host; it also exposes the deobfuscation pipeline as granular steps
+/// so the Axum binary can wrap the load step with a concurrency gate while
+/// keeping cache hits gate-free.
 pub struct Spinyarn {
     mappings_dir: String,
     auto_download: bool,
@@ -38,31 +40,123 @@ pub struct DeobfuscateOutput {
 impl Spinyarn {
     /// Build an engine from a loaded [`config::Config`].
     pub fn new(config: &config::Config) -> Self {
-        let cache = if config.cache.enabled {
-            Some(Arc::new(cache::Cache::new(config.cache.clone())))
-        } else {
+        Self::from_settings_with_cache(
+            &config.maven.mappings_dir,
+            config.maven.auto_download,
+            if config.cache.enabled {
+                config.cache.max_entries
+            } else {
+                0
+            },
+        )
+    }
+
+    /// Build an engine from explicit settings (no config file), with the
+    /// default LRU cache configuration. Used by the C ABI.
+    pub fn from_settings(mappings_dir: &str, auto_download: bool) -> Self {
+        Self::from_settings_with_cache(
+            mappings_dir,
+            auto_download,
+            config::CacheConfig::default().max_entries,
+        )
+    }
+
+    /// Build an engine from explicit settings with a custom cache bound.
+    /// `cache_max_entries == 0` disables the LRU cache entirely; otherwise it
+    /// caps the cache at `cache_max_entries` entries (watermarks scale with the
+    /// cap). Lets embedding hosts (PHP-FPM workers) trade memory for hit rate.
+    pub fn from_settings_with_cache(
+        mappings_dir: &str,
+        auto_download: bool,
+        cache_max_entries: usize,
+    ) -> Self {
+        let cache = if cache_max_entries == 0 {
             None
+        } else {
+            let mut cfg = config::CacheConfig::default();
+            if cache_max_entries != cfg.max_entries {
+                cfg.max_entries = cache_max_entries;
+                cfg.high_watermark = cache_max_entries.max(1);
+                cfg.low_watermark = (cache_max_entries * 3 / 4).max(1);
+            }
+            Some(Arc::new(cache::Cache::new(cfg)))
         };
         Spinyarn {
-            mappings_dir: config.maven.mappings_dir.clone(),
-            auto_download: config.maven.auto_download,
+            mappings_dir: mappings_dir.to_string(),
+            auto_download,
             cache,
         }
     }
 
-    /// Build an engine from explicit settings (no config file). Used by the
-    /// C ABI, where the host process executable is not SpinYarn and a config
-    /// file is unnecessary: the caller supplies the mappings dir and the
-    /// auto-download toggle directly. The LRU cache uses its defaults (on).
-    pub fn from_settings(mappings_dir: &str, auto_download: bool) -> Self {
-        Spinyarn {
-            mappings_dir: mappings_dir.to_string(),
-            auto_download,
-            cache: Some(Arc::new(cache::Cache::new(config::CacheConfig::default()))),
+    /// The mappings directory this engine reads from.
+    pub fn mappings_dir(&self) -> &str {
+        &self.mappings_dir
+    }
+
+    /// Whether on-demand mapping download is enabled.
+    pub fn auto_download(&self) -> bool {
+        self.auto_download
+    }
+
+    /// Make sure a mapping for `version`/`mapping_type` is available locally,
+    /// downloading it on demand when enabled. Returns `false` when the caller
+    /// should pass the input through unchanged (unsupported or download failed).
+    pub fn ensure_available(&self, version: &str, mtype: MappingType) -> bool {
+        if dispatcher::is_supported(version, &self.mappings_dir, mtype) {
+            return true;
+        }
+        if !(self.auto_download && is_downloadable_version(version)) {
+            return false;
+        }
+        let result = match mtype {
+            MappingType::Yarn => ensure_mapping(version, &self.mappings_dir, false),
+            MappingType::Vanilla => ensure_vanilla_mapping(version, &self.mappings_dir, false),
+        };
+        match result {
+            Ok(true) => true,
+            Ok(false) => false,
+            Err(e) => {
+                tracing::warn!(
+                    "auto-download failed for {} {}: {}",
+                    mtype.as_str(),
+                    version,
+                    e
+                );
+                false
+            }
         }
     }
 
-    /// Deobfuscate `content` against `version`/`mapping_type`.
+    /// Look up an already-parsed mapping in the cache (no load performed).
+    pub fn get_cached(&self, version: &str, mtype: MappingType) -> Option<Arc<LoadedMappings>> {
+        self.cache.as_ref()?.get(&mtype.cache_key(version))
+    }
+
+    /// Load a mapping set from disk (no cache interaction).
+    pub fn load(&self, version: &str, mtype: MappingType) -> Option<LoadedMappings> {
+        match dispatcher::load(version, &self.mappings_dir, mtype) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                tracing::warn!("load error for {} {}: {}", mtype.as_str(), version, e);
+                None
+            }
+        }
+    }
+
+    /// Store a freshly loaded mapping set in the cache (shared via the same Arc).
+    pub fn insert_cached(&self, version: &str, mtype: MappingType, shared: &Arc<LoadedMappings>) {
+        if let Some(cache) = &self.cache {
+            cache.insert(&mtype.cache_key(version), Arc::clone(shared));
+        }
+    }
+
+    /// Deobfuscate `content` against an already-loaded mapping set (zero-copy).
+    pub fn deobfuscate_loaded(shared: &LoadedMappings, content: &str) -> DeobfuscateOutput {
+        Self::output_from(dispatcher::deobfuscate(shared, content))
+    }
+
+    /// Full deobfuscation pipeline (used by the C ABI and simple embeds):
+    /// ensure available -> cache lookup -> load -> cache -> deobfuscate.
     ///
     /// Pass-through behaviour matches the HTTP API: an unsupported/unavailable
     /// version returns the input unchanged with zero counters (never an error).
@@ -72,48 +166,21 @@ impl Spinyarn {
         version: &str,
         mapping_type: MappingType,
     ) -> DeobfuscateOutput {
-        let mtype = mapping_type;
-
-        if !dispatcher::is_supported(version, &self.mappings_dir, mtype) {
-            if self.auto_download && is_downloadable_version(version) {
-                let ready = match mtype {
-                    MappingType::Yarn => ensure_mapping(version, &self.mappings_dir, false),
-                    MappingType::Vanilla => ensure_vanilla_mapping(version, &self.mappings_dir, false),
-                };
-                match ready {
-                    Ok(true) => {}
-                    Ok(false) | Err(_) => {
-                        return Self::passthrough(content);
-                    }
-                }
-            } else {
-                return Self::passthrough(content);
-            }
+        if !self.ensure_available(version, mapping_type) {
+            return Self::passthrough(content);
         }
 
-        let cache_key = mtype.cache_key(version);
-
-        if let Some(cache) = &self.cache {
-            if let Some(shared) = cache.get(&cache_key) {
-                return Self::output_from(dispatcher::deobfuscate(&shared, content));
-            }
+        if let Some(shared) = self.get_cached(version, mapping_type) {
+            return Self::deobfuscate_loaded(&shared, content);
         }
 
-        let loaded = match dispatcher::load(version, &self.mappings_dir, mtype) {
-            Ok(Some(loaded)) => loaded,
-            Ok(None) => return Self::passthrough(content),
-            Err(e) => {
-                tracing::warn!("deobfuscate load error for {} {}: {}", mtype.as_str(), version, e);
-                return Self::passthrough(content);
-            }
+        let Some(loaded) = self.load(version, mapping_type) else {
+            return Self::passthrough(content);
         };
 
         let shared = Arc::new(loaded);
-        if let Some(cache) = &self.cache {
-            cache.insert(&cache_key, Arc::clone(&shared));
-        }
-
-        Self::output_from(dispatcher::deobfuscate(&shared, content))
+        self.insert_cached(version, mapping_type, &shared);
+        Self::deobfuscate_loaded(&shared, content)
     }
 
     /// Load/refresh a version's mapping file from its source.
@@ -139,6 +206,21 @@ impl Spinyarn {
         self.cache.as_ref().map(|c| c.stats())
     }
 
+    /// Remove a version's local files (both families) and drop cache entries.
+    /// Returns `(removed_file_paths, removed_cache_types)`.
+    pub fn unload(&self, version: &str) -> (Vec<String>, Vec<String>) {
+        let removed_files = dispatcher::remove_all_local(version, &self.mappings_dir);
+        let mut removed_cache = Vec::new();
+        if let Some(cache) = &self.cache {
+            for mt in [MappingType::Yarn, MappingType::Vanilla] {
+                if cache.remove(&mt.cache_key(version)) {
+                    removed_cache.push(mt.as_str().to_string());
+                }
+            }
+        }
+        (removed_files, removed_cache)
+    }
+
     fn passthrough(content: &str) -> DeobfuscateOutput {
         DeobfuscateOutput {
             deobfuscated: content.to_string(),
@@ -157,5 +239,58 @@ impl Spinyarn {
             fields_mapped: result.fields_mapped,
             total_time_ms: result.total_time_ms,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_from_settings_with_cache_disabled() {
+        let s = Spinyarn::from_settings_with_cache("/tmp", false, 0);
+        assert!(s.cache.is_none());
+    }
+
+    #[test]
+    fn test_from_settings_with_cache_custom_bound() {
+        let s = Spinyarn::from_settings_with_cache("/tmp", false, 8);
+        let cache = s.cache.as_ref().expect("cache enabled");
+        let stats = cache.stats();
+        assert!(stats.enabled);
+        // entry count is 0; the bound is enforced on insert (see cache tests)
+    }
+
+    #[test]
+    fn test_unload_removes_files_and_cache() {
+        let dir = std::env::temp_dir().join(format!("spinyarn-unload-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(dir.join("vanilla")).unwrap();
+        let mut f = std::fs::File::create(dir.join("vanilla").join("1.21.4.txt")).unwrap();
+        f.write_all(b"com.example.Main -> a:\n    0:10:void init() -> b\n").unwrap();
+
+        let s = Spinyarn::from_settings(dir.to_str().unwrap(), false);
+        // Populate the cache by loading once.
+        let loaded = s.load("1.21.4", MappingType::Vanilla).expect("load");
+        let shared = Arc::new(loaded);
+        s.insert_cached("1.21.4", MappingType::Vanilla, &shared);
+
+        let (files, cache_types) = s.unload("1.21.4");
+        assert!(files.iter().any(|p| p.contains("1.21.4.txt")));
+        assert_eq!(cache_types, vec!["vanilla"]);
+        assert!(s.get_cached("1.21.4", MappingType::Vanilla).is_none());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_passthrough_unsupported_version() {
+        let s = Spinyarn::from_settings("/tmp/nonexistent", false);
+        // Snapshot version is not downloadable -> passthrough.
+        let out = s.deobfuscate("at a.b(X.java:1)", "25w44a", MappingType::Yarn);
+        assert_eq!(out.deobfuscated, "at a.b(X.java:1)");
+        assert_eq!(out.classes_mapped, 0);
     }
 }

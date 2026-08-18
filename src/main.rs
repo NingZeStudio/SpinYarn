@@ -15,7 +15,8 @@ fn ensure_one(version: &str, mappings_dir: &str) {
     if !Path::new(&yarn).exists() {
         match ensure_mapping(version, mappings_dir, false) {
             Ok(true) => tracing::info!("bootstrap: {} yarn ready", version),
-            _ => tracing::warn!("bootstrap: {} yarn failed or unsupported", version),
+            Ok(false) => tracing::warn!("bootstrap: {} yarn unsupported (no maven build)", version),
+            Err(e) => tracing::warn!("bootstrap: {} yarn failed: {}", version, e),
         }
     }
 

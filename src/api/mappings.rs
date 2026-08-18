@@ -10,7 +10,7 @@ use crate::api::response::ApiResponse;
 use crate::api::AppState;
 use crate::error::ApiError;
 use crate::mapping::dispatcher::{self, MappingType};
-use crate::mapping::download::{ensure_mapping, ensure_vanilla_mapping, is_valid_version};
+use crate::mapping::download::is_valid_version;
 
 /// Reject a version that would escape the mappings dir when used in a path.
 /// The `dispatcher::local_path` helpers join the version verbatim, so every
@@ -68,16 +68,13 @@ pub async fn load_mapping(
     validate_version(&req.version)?;
 
     let version = req.version.clone();
-    let mappings_dir = state.mappings_dir.clone();
-    let ready = tokio::task::spawn_blocking(move || match mtype {
-        MappingType::Yarn => ensure_mapping(&version, &mappings_dir, force),
-        MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir, force),
-    })
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let spinyarn = state.spinyarn.clone();
+    let ready = tokio::task::spawn_blocking(move || spinyarn.load_mapping(&version, mtype, force))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let path = dispatcher::local_path(&req.version, &state.mappings_dir, mtype);
+    let path = dispatcher::local_path(&req.version, state.spinyarn.mappings_dir(), mtype);
     let bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
     Ok(Json(ApiResponse::success(LoadedInfo {
         version: req.version,
@@ -105,9 +102,9 @@ pub async fn load_mapping_local(
     validate_version(&req.version)?;
 
     // Resolve + canonicalize inside the mappings dir; reject any traversal.
-    let source = safe_local_path(&state.mappings_dir, &req.path)?;
+    let source = safe_local_path(state.spinyarn.mappings_dir(), &req.path)?;
 
-    let target = dispatcher::local_path(&req.version, &state.mappings_dir, mtype);
+    let target = dispatcher::local_path(&req.version, state.spinyarn.mappings_dir(), mtype);
     if let Some(parent) = target.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| ApiError::Internal(format!("create dir: {e}")))?;
@@ -129,7 +126,7 @@ pub async fn load_mapping_local(
 pub async fn list_mappings(
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<MappingsList>>, ApiError> {
-    let base = FsPath::new(&state.mappings_dir);
+    let base = FsPath::new(state.spinyarn.mappings_dir());
     let mut yarn = Vec::new();
     if let Ok(entries) = std::fs::read_dir(base) {
         for e in entries.flatten() {
@@ -165,13 +162,12 @@ pub async fn mapping_stats(
     Path((mtype, version)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<MappingStats>>, ApiError> {
     let mtype = MappingType::parse(&mtype);
+    let spinyarn = state.spinyarn.clone();
     let loaded = tokio::task::spawn_blocking({
         let version = version.clone();
-        let dir = state.mappings_dir.clone();
-        move || dispatcher::load(&version, &dir, mtype)
+        move || spinyarn.load(&version, mtype)
     })
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let Some(loaded) = loaded else {
@@ -218,15 +214,7 @@ pub async fn unload_mapping(
     Path(version): Path<String>,
 ) -> Result<Json<ApiResponse<UnloadInfo>>, ApiError> {
     validate_version(&version)?;
-    let removed_files = dispatcher::remove_all_local(&version, &state.mappings_dir);
-    let mut removed_cache = Vec::new();
-    if let Some(cache) = &state.cache {
-        for mt in [MappingType::Yarn, MappingType::Vanilla] {
-            if cache.remove(&mt.cache_key(&version)) {
-                removed_cache.push(mt.as_str().to_string());
-            }
-        }
-    }
+    let (removed_files, removed_cache) = state.spinyarn.unload(&version);
     if removed_files.is_empty() && removed_cache.is_empty() {
         return Err(ApiError::NotFound(format!("mapping {} not cached", version)));
     }

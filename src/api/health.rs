@@ -34,7 +34,7 @@ pub async fn handler(
         0
     };
 
-    let cache = state.cache.as_ref().map(|c| c.stats());
+    let cache = state.spinyarn.cache_stats();
 
     Json(crate::api::response::ApiResponse::success(HealthResponse {
         status: "healthy",

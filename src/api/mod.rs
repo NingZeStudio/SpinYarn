@@ -9,8 +9,8 @@ use tower_http::{
 use tracing::{debug_span, info_span, Span};
 use utoipa::OpenApi;
 
-use crate::cache::Cache;
 use crate::config::Config;
+use crate::Spinyarn;
 
 mod deobfuscate;
 mod health;
@@ -47,19 +47,17 @@ mod response;
         title = "SpinYarn API",
         description = "Minecraft 日志反混淆服务：Fabric(Yarn) 与 Vanilla(Mojang official) 映射支持。",
         // utoipa's macro only accepts a literal here; keep in sync with Cargo.toml.
-        version = "0.3.2"
+        version = "0.9.0"
     )
 )]
 struct ApiDoc;
 
-/// Router-wide state: the deobfuscation concurrency gate, the external
-/// mappings directory, auto-download toggle, and the in-memory mapping cache.
+/// Router-wide state: the deobfuscation concurrency gate and the shared engine
+/// (which owns the mappings dir, auto-download toggle, and LRU cache).
 #[derive(Clone)]
 pub struct AppState {
     pub gate: Arc<Semaphore>,
-    pub mappings_dir: String,
-    pub auto_download: bool,
-    pub cache: Option<Arc<Cache>>,
+    pub spinyarn: Arc<Spinyarn>,
 }
 
 fn make_info_span(request: &axum::extract::Request) -> Span {
@@ -156,13 +154,7 @@ pub fn build_router(config: Config) -> Router {
         )
         .with_state(AppState {
             gate: Arc::new(Semaphore::new(config.server.max_concurrency)),
-            mappings_dir: config.maven.mappings_dir,
-            auto_download: config.maven.auto_download,
-            cache: if config.cache.enabled {
-                Some(Arc::new(Cache::new(config.cache.clone())))
-            } else {
-                None
-            },
+            spinyarn: Arc::new(Spinyarn::new(&config)),
         });
     Router::new().merge(api_routes).layer(cors)
 }

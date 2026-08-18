@@ -20,6 +20,16 @@ typedef enum {
     SPINYARN_VANILLA = 1,
 } spinyarn_mapping_type_t;
 
+/* Compile-time guard: the discriminants must match the Rust #[repr(C)] enum
+ * in spinyarn-capi (spinyarn_mapping_type_t) and the PHP extension constants. */
+#if defined(__cplusplus)
+static_assert(SPINYARN_YARN == 0 && SPINYARN_VANILLA == 1,
+              "spinyarn_mapping_type_t discriminants must be 0/1");
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+_Static_assert(SPINYARN_YARN == 0 && SPINYARN_VANILLA == 1,
+               "spinyarn_mapping_type_t discriminants must be 0/1");
+#endif
+
 /*
  * Create an engine from explicit settings (no config file).
  * - `mappings_dir`: directory holding the mapping files. Pass NULL to fall back
@@ -28,6 +38,15 @@ typedef enum {
  * Returns NULL on failure.
  */
 spinyarn_handle_t *spinyarn_init(const char *mappings_dir, int auto_download);
+
+/*
+ * Same as spinyarn_init, but lets the host control the LRU cache.
+ * - `cache_max_entries`: 0 = disable the cache; a positive value caps it at
+ *   that many entries. Use this from PHP-FPM-style multi-worker hosts to bound
+ *   per-process memory.
+ */
+spinyarn_handle_t *spinyarn_init_ext(const char *mappings_dir, int auto_download,
+                                     size_t cache_max_entries);
 
 /* Release the engine and all associated resources. */
 void spinyarn_free(spinyarn_handle_t *handle);
@@ -45,7 +64,15 @@ spinyarn_result_t *spinyarn_deobfuscate(
     const char *version,
     spinyarn_mapping_type_t mapping_type);
 
-/* Deobfuscated UTF-8 text and its byte length. */
+/*
+ * Deobfuscated UTF-8 text and its byte length.
+ *
+ * NOTE: the text is truncated at the first NUL byte (0x00) if the input log
+ * contains one, since `spinyarn_result_text` returns a NUL-terminated C string.
+ * Real Minecraft logs are NUL-free, so this is a non-issue in practice; use
+ * `spinyarn_result_len` as the authoritative length (it reflects the truncated
+ * payload, not the original).
+ */
 const char *spinyarn_result_text(const spinyarn_result_t *result);
 size_t spinyarn_result_len(const spinyarn_result_t *result);
 

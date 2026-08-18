@@ -6,22 +6,34 @@
 
 ### 架构重构：Web API 与 C ABI 双产物
 - **Workspace 化**：核心逻辑抽离为 `spinyarn-core`（`crates/core/`，纯 Rust 同步库，无 axum/tokio/utoipa 依赖）；根 package 保留 Axum Web API（`src/`），`src/lib.rs` 通过 `pub use spinyarn_core::{...}` re-export 核心，集成测试/bench 的 `spinyarn::mapping::...` 引用零改动
-- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露同步方法 `deobfuscate()`（透传→自动下载→缓存→加载→反混淆）、`load_mapping()`、`has_mapping()`、`cache_stats()`，作为 C ABI 与任何嵌入宿主的统一入口；另有 `from_settings(mappings_dir, auto_download)` 从显式设置构建（无需 Config）
+- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露**完整流水线** `deobfuscate()` 与**分步方法** `ensure_available()`/`get_cached()`/`load()`/`insert_cached()`/`deobfuscate_loaded()`（Web API 精确控制信号量门控），另有 `load_mapping()`/`has_mapping()`/`cache_stats()`/`unload()`；构造器 `new(&Config)`/`from_settings(dir, auto_download)`/`from_settings_with_cache(dir, auto_download, cache_max_entries)`
+- **Web API 复用门面**：`src/api/deobfuscate.rs` 的 `process` 改为委托 `Spinyarn` 分步方法，消除与 core 的流水线重复；`AppState` 改持 `Arc<Spinyarn>`
 
 ### C ABI 共享库（crates/capi/）
 - 新增 `spinyarn-capi`（cdylib + staticlib），头文件 `crates/capi/include/spinyarn.h`
-- 导出：`spinyarn_init`（mappings_dir 指针 + auto_download 整型，**无配置文件**）/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
-- 所有 `extern "C"` 函数 `catch_unwind` 防 panic 跨 FFI 边界（UB）；句柄/结果用 `Box::into_raw` + 显式 free；NULL 参数安全
+- 导出：`spinyarn_init`（mappings_dir 指针 + auto_download 整型，**无配置文件**）/`spinyarn_init_ext`（额外 `cache_max_entries`，0 = 禁用缓存）/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度，64MB 上限）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
+- 所有 `extern "C"` 函数 `catch_unwind` 防 panic 跨 FFI 边界（UB）；句柄/结果用 `Box::into_raw` + 显式 free；NULL 参数安全；枚举判别值 `static_assert` 守护
 
 ### PHP 8 扩展（crates/php/）
-- 新增 PHP 扩展（`config.m4` + `spinyarn.c` + `php_spinyarn.h`），链接 `libspinyarn_capi`
-- 函数：`spinyarn_init(?string $mappings_dir = null, bool $auto_download = true)` → resource；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
-- handle 为 PHP resource，析构自动 `spinyarn_free`
+- 新增 PHP 扩展（`config.m4` + `spinyarn.c` + `php_spinyarn.h` + `spinyarn.stub.php`），链接 `libspinyarn_capi`
+- 函数：`spinyarn_init(?string $mappings_dir = null, bool $auto_download = true, int $cache_max_entries = 0)` → resource；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
+- handle 为 PHP resource，析构自动 `spinyarn_free`；`spinyarn_deobfuscate` 对 result 文本判空防御
 
 ### 变更
 - `download.rs::is_valid_version` 从 `pub(crate)` 提升为 `pub`（跨 crate 供 Web API 层路径穿越校验）
 - `CacheStats` 的 `utoipa::ToSchema` 派生改为可选 feature `utoipa`（core 默认不依赖 utoipa）
 - CI/Release 改为 `cargo build --workspace`，Release 双产物打包（binary + cdylib，Windows 为 `.dll`）
+
+### Code Review 修复（第三轮）
+- **下载失败日志区分**：`Spinyarn::ensure_available` 与 `main.rs::ensure_one` 区分 `Ok(false)`（版本不可下载）与 `Err`（网络/IO 错误），`Err` 记 `warn!` 留痕
+- **`unique_tmp` 叠加原子计数器**：纳秒时间戳 + `AtomicU64` 序列号，杜绝极端并发同纳秒碰撞
+- **`launcher_manifest` 锁外网络请求**：缓存过期/空时先释放锁再 fetch，避免并发 vanilla 下载全部阻塞在锁上
+- **`content_len` 上限 64MB**：`spinyarn_deobfuscate` 对恶意超大长度返回 NULL，防越界读/OOM
+- **复杂类型抽别名**：`mapping/vanilla.rs` 的 `MethodRange` 别名，clippy 清零
+- **bootstrap 版本一致性测试**：`config.rs` 新增测试断言 `default_bootstrap_versions` 与 `scripts/download_mappings.sh` 的 `VERSIONS` 数组一致
+- **config.m4 依赖预检**：缺库/头文件时 `AC_MSG_ERROR` 提前报错，构建失败信息友好
+- **OpenAPI 版本号同步**：`info(version = "0.9.0")` 占位符更新
+- clippy 全仓清零（含历史遗留 `&*shared` ×2）
 
 ## [v0.3.4] - 2026-08-17
 

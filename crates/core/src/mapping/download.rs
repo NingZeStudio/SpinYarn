@@ -1,5 +1,6 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -136,18 +137,22 @@ fn http_get(url: &str) -> Result<Vec<u8>, MappingLoadError> {
     Ok(body)
 }
 
+/// Monotonic per-process sequence to disambiguate temp files created within
+/// the same nanosecond (a nano-second timestamp alone could collide under
+/// extreme concurrency).
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
 /// A unique temporary file path next to `target`, so concurrent downloads of
 /// the same version (e.g. startup bootstrap racing a request) never collide on
 /// the same `.tmp` file. The final artifact is renamed over atomically.
 fn unique_tmp(target: &Path) -> PathBuf {
     let mut file_name = target.file_name().unwrap_or_default().to_owned();
-    file_name.push(format!(
-        ".tmp.{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    ));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    file_name.push(format!(".tmp.{}.{}", nanos, seq));
     target.with_file_name(file_name)
 }
 
@@ -249,21 +254,30 @@ fn fetch_launcher_manifest() -> Result<Vec<(String, String)>, MappingLoadError> 
 
 /// The launcher version manifest entries `(version id, version json url)`,
 /// cached in-process for `VANILLA_MANIFEST_TTL` to avoid one HTTP fetch per
-/// version during a full bootstrap. A poisoned/cleared lock falls back to an
-/// uncached fetch.
+/// version during a full bootstrap.
+///
+/// The network fetch happens **outside** the cache lock: a stale/empty cache
+/// releases the lock before `fetch_launcher_manifest` (up to 20s), so concurrent
+/// vanilla downloads don't all block on one holder. A poisoned lock falls back
+/// to an uncached fetch.
 fn launcher_manifest() -> Result<Vec<(String, String)>, MappingLoadError> {
     let now = Instant::now();
-    let mut cache = match VANILLA_MANIFEST_CACHE.lock() {
-        Ok(guard) => guard,
-        Err(_) => return fetch_launcher_manifest(), // poisoned lock
-    };
-    if let Some((at, entries)) = cache.as_ref() {
-        if at.elapsed() < VANILLA_MANIFEST_TTL {
-            return Ok(entries.clone());
+    {
+        let cache = match VANILLA_MANIFEST_CACHE.lock() {
+            Ok(guard) => guard,
+            Err(_) => return fetch_launcher_manifest(), // poisoned lock
+        };
+        if let Some((at, entries)) = cache.as_ref() {
+            if at.elapsed() < VANILLA_MANIFEST_TTL {
+                return Ok(entries.clone());
+            }
         }
     }
+    // Fetch outside the lock, then briefly re-acquire to store the result.
     let entries = fetch_launcher_manifest()?;
-    *cache = Some((now, entries.clone()));
+    if let Ok(mut cache) = VANILLA_MANIFEST_CACHE.lock() {
+        *cache = Some((now, entries.clone()));
+    }
     Ok(entries)
 }
 

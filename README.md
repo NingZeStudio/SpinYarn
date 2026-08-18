@@ -61,13 +61,14 @@ gcc -shared -fPIC -O2 -DCOMPILE_DL_SPINYARN $(php-config --includes) \
 加载与调用（运行时需 `LD_LIBRARY_PATH` 指向 cdylib）：
 
 ```php
-// 无需配置文件：直接传映射目录 + 是否自动下载
-$handle = spinyarn_init(__DIR__ . '/mappings', true);
+// 无需配置文件：直接传映射目录 + 是否自动下载（+ 可选缓存上限）
+$handle = spinyarn_init(__DIR__ . '/mappings', true);        // 默认缓存
+$handle = spinyarn_init(__DIR__ . '/mappings', true, 0);     // 禁用 LRU 缓存
 $r = spinyarn_deobfuscate($handle, $log, '1.21.9', SPINYARN_YARN);
 // $r = ['deobfuscated' => ..., 'classes_mapped' => 1, 'methods_mapped' => 1, ...]
 ```
 
-PHP 函数：`spinyarn_init` / `spinyarn_deobfuscate` / `spinyarn_load_mapping` / `spinyarn_has_mapping` / `spinyarn_version`；常量 `SPINYARN_YARN` / `SPINYARN_VANILLA`。handle 是 PHP resource，析构自动释放。
+PHP 函数：`spinyarn_init` / `spinyarn_deobfuscate` / `spinyarn_load_mapping` / `spinyarn_has_mapping` / `spinyarn_version`；常量 `SPINYARN_YARN` / `SPINYARN_VANILLA`。handle 是 PHP resource，析构自动释放。完整签名见 `crates/php/spinyarn.stub.php`。
 
 ### 部署与运行
 

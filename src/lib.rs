@@ -7,7 +7,7 @@ pub mod error;
 
 // Re-export the core engine so `spinyarn::mapping::...` / `spinyarn::deobfuscator::...`
 // paths keep working for tests, benches, and downstream embedders.
-pub use spinyarn_core::{cache, config, deobfuscator, mapping, Spinyarn};
+pub use spinyarn_core::{cache, config, deobfuscator, mapping, DeobfuscateOutput, Spinyarn};
 
 use std::sync::atomic::AtomicU64;
 

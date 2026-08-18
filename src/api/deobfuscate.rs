@@ -7,14 +7,10 @@ use axum::{
 use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::{
-    api::AppState,
-    error::ApiError,
-    mapping::{
-        dispatcher::{self, MappingType},
-        download::{ensure_mapping, ensure_vanilla_mapping, is_downloadable_version},
-    },
-};
+use crate::api::AppState;
+use crate::error::ApiError;
+use crate::mapping::dispatcher::MappingType;
+use crate::{DeobfuscateOutput, Spinyarn};
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct DeobfuscateRequest {
@@ -55,98 +51,77 @@ fn passthrough_stats(version: String) -> DeobfuscateStats {
     }
 }
 
-fn outcome_from(result: crate::deobfuscator::DeobfuscateResult, version: String) -> DeobfuscateOutcome {
+fn outcome_from(output: DeobfuscateOutput, version: String) -> DeobfuscateOutcome {
     DeobfuscateOutcome {
-        text: result.text,
+        text: output.deobfuscated,
         stats: DeobfuscateStats {
             version,
-            classes_mapped: result.classes_mapped,
-            methods_mapped: result.methods_mapped,
-            fields_mapped: result.fields_mapped,
-            total_time_ms: result.total_time_ms,
+            classes_mapped: output.classes_mapped,
+            methods_mapped: output.methods_mapped,
+            fields_mapped: output.fields_mapped,
+            total_time_ms: output.total_time_ms,
         },
     }
 }
 
-/// Shared pipeline for both JSON and plain-text handlers:
-/// passthrough check -> (auto-download) -> cache lookup -> gate/load -> deobfuscate.
+/// Shared pipeline for both JSON and plain-text handlers, delegating to the
+/// `Spinyarn` facade. The concurrency gate wraps only the load step; cache hits
+/// and the auto-download/ensure step stay gate-free (nothing loads on a hit).
 async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<DeobfuscateOutcome, ApiError> {
     let mtype = MappingType::parse(&req.mapping_type);
+    let spinyarn = state.spinyarn.clone();
 
-    if !dispatcher::is_supported(&req.version, &state.mappings_dir, mtype) {
-        // Auto-download applies to both families when the version token matches.
-        if state.auto_download && is_downloadable_version(&req.version) {
-            let version = req.version.clone();
-            let mappings_dir = state.mappings_dir.clone();
-            let ready = tokio::task::spawn_blocking(move || match mtype {
-                MappingType::Yarn => ensure_mapping(&version, &mappings_dir, false),
-                MappingType::Vanilla => ensure_vanilla_mapping(&version, &mappings_dir, false),
-            })
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-            if !ready {
-                return Ok(DeobfuscateOutcome {
-                    text: req.content,
-                    stats: passthrough_stats(req.version),
-                });
-            }
-        } else {
-            return Ok(DeobfuscateOutcome {
-                text: req.content,
-                stats: passthrough_stats(req.version),
-            });
-        }
+    // 1. Ensure the mapping is available (may auto-download), off the gate.
+    let version = req.version.clone();
+    let engine = spinyarn.clone();
+    let available = tokio::task::spawn_blocking(move || engine.ensure_available(&version, mtype))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if !available {
+        return Ok(DeobfuscateOutcome {
+            text: req.content,
+            stats: passthrough_stats(req.version),
+        });
     }
 
-    let cache_key = mtype.cache_key(&req.version);
-
-    // Cache hit: share the already-parsed table, skip the gate (nothing loads).
-    if let Some(cache) = &state.cache {
-        if let Some(shared) = cache.get(&cache_key) {
-            let content = req.content;
-            let deobfuscated = tokio::task::spawn_blocking(move || {
-                dispatcher::deobfuscate(&*shared, &content)
-            })
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-            return Ok(outcome_from(deobfuscated, req.version));
-        }
+    // 2. Cache hit: deobfuscate directly, no gate (nothing loads).
+    if let Some(shared) = spinyarn.get_cached(&req.version, mtype) {
+        let content = req.content;
+        let deobfuscated = tokio::task::spawn_blocking(move || {
+            Spinyarn::deobfuscate_loaded(&shared, &content)
+        })
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        return Ok(outcome_from(deobfuscated, req.version));
     }
 
-    // Bound peak memory: at most N in-flight mapping table sets.
+    // 3. Bound peak memory: at most N in-flight mapping table sets.
     let _permit = state
         .gate
         .acquire()
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
+    // 4. CPU-bound: load + parse, then cache and deobfuscate.
     let version = req.version.clone();
     let content = req.content;
-    let mappings_dir = state.mappings_dir.clone();
-
-    // CPU-bound: load + parse the requested mapping family.
-    let loaded = tokio::task::spawn_blocking(move || dispatcher::load(&version, &mappings_dir, mtype))
+    let engine = spinyarn.clone();
+    let loaded = tokio::task::spawn_blocking(move || engine.load(&version, mtype))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let Some(loaded) = loaded else {
-        // Declared supported but no mapping available -> pass through.
         return Ok(DeobfuscateOutcome {
             text: content,
             stats: passthrough_stats(req.version),
         });
     };
 
-    // Populate the cache with the parsed table, sharing the same Arc we deobfuscate with.
     let shared = std::sync::Arc::new(loaded);
-    if let Some(cache) = &state.cache {
-        cache.insert(&cache_key, std::sync::Arc::clone(&shared));
-    }
+    spinyarn.insert_cached(&req.version, mtype, &shared);
 
     let deobfuscated = tokio::task::spawn_blocking(move || {
-        dispatcher::deobfuscate(&*shared, &content)
+        Spinyarn::deobfuscate_loaded(&shared, &content)
     })
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;

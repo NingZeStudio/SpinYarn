@@ -27,6 +27,12 @@ pub struct spinyarn_handle {
     inner: Spinyarn,
 }
 
+/// Maximum accepted `content_len` for a single deobfuscation call, aligned with
+/// the Web API's `DEFAULT_MAX_BODY_SIZE`. Guards against a misbehaving host
+/// passing a bogus huge length that would cause an out-of-bounds read or a
+/// large allocation.
+const MAX_CONTENT_LEN: usize = 64 * 1024 * 1024;
+
 /// Opaque result: owns the deobfuscated text plus per-pass counters.
 pub struct spinyarn_result {
     text: CString,
@@ -55,23 +61,14 @@ fn to_mapping_type(t: spinyarn_mapping_type_t) -> MappingType {
 /// # Safety
 /// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
 /// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). `auto_download` is 0/1.
+/// Uses the default LRU cache bound.
 #[no_mangle]
 pub extern "C" fn spinyarn_init(
     mappings_dir: *const c_char,
     auto_download: c_int,
 ) -> *mut spinyarn_handle {
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let dir = if mappings_dir.is_null() {
-            None
-        } else {
-            Some(unsafe { std::ffi::CStr::from_ptr(mappings_dir) }.to_string_lossy())
-        };
-        // An explicit dir wins; otherwise fall back to Config's default
-        // (SPINYARN_MAPPINGS_DIR or the host exe's ./mappings).
-        let config = Config::default();
-        let dir = dir
-            .map(|d| d.into_owned())
-            .unwrap_or_else(|| config.maven.mappings_dir.clone());
+        let dir = resolve_dir(mappings_dir);
         let inner = Spinyarn::from_settings(&dir, auto_download != 0);
         Box::into_raw(Box::new(spinyarn_handle { inner }))
     }));
@@ -79,6 +76,39 @@ pub extern "C" fn spinyarn_init(
         Ok(handle) => handle,
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+/// # Safety
+/// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
+/// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). `auto_download` is 0/1.
+/// `cache_max_entries`: 0 = disable the LRU cache; a positive value caps the
+/// cache at that many entries.
+#[no_mangle]
+pub extern "C" fn spinyarn_init_ext(
+    mappings_dir: *const c_char,
+    auto_download: c_int,
+    cache_max_entries: usize,
+) -> *mut spinyarn_handle {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let dir = resolve_dir(mappings_dir);
+        let inner =
+            Spinyarn::from_settings_with_cache(&dir, auto_download != 0, cache_max_entries);
+        Box::into_raw(Box::new(spinyarn_handle { inner }))
+    }));
+    match result {
+        Ok(handle) => handle,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Resolve the mappings dir from a C string (NULL → Config default).
+fn resolve_dir(mappings_dir: *const c_char) -> String {
+    if mappings_dir.is_null() {
+        return Config::default().maven.mappings_dir.clone();
+    }
+    unsafe { std::ffi::CStr::from_ptr(mappings_dir) }
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// # Safety
@@ -107,6 +137,9 @@ pub extern "C" fn spinyarn_deobfuscate(
     mapping_type: spinyarn_mapping_type_t,
 ) -> *mut spinyarn_result {
     if handle.is_null() || content.is_null() || version.is_null() {
+        return std::ptr::null_mut();
+    }
+    if content_len == 0 || content_len > MAX_CONTENT_LEN {
         return std::ptr::null_mut();
     }
     let result = catch_unwind(AssertUnwindSafe(|| {

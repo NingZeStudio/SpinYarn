@@ -16,10 +16,14 @@ pub struct VanillaMappings {
     /// readable class name set, to confirm an already-readable class path
     classes_named: HashSet<String>,
     /// class(obf) -> method(obf) -> (start line, end line, readable name)
-    methods_by_class: HashMap<String, HashMap<String, Vec<(u32, u32, String)>>>,
+    methods_by_class: HashMap<String, HashMap<String, MethodRange>>,
     /// class(obf) -> field(obf) -> readable name
     fields_by_class: HashMap<String, HashMap<String, String>>,
 }
+
+/// A method's line ranges within a class: `(start_line, end_line, readable_name)`.
+/// Multiple entries per obfuscated name disambiguate overloads by source line.
+type MethodRange = Vec<(u32, u32, String)>;
 
 impl VanillaMappings {
     /// Resolve a class path segment: obfuscated -> readable, or confirm an
