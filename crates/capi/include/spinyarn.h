@@ -105,7 +105,7 @@ int spinyarn_has_mapping(
     const char *version,
     spinyarn_mapping_type_t mapping_type);
 
-/* Library version string (e.g. "0.9.0"). */
+/* Library version string (e.g. "1.0.0-pre.1"). */
 const char *spinyarn_version(void);
 
 /*

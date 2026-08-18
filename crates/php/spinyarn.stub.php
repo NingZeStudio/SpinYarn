@@ -60,7 +60,7 @@ function spinyarn_load_mapping($handle, string $version, int $mapping_type = SPI
 function spinyarn_has_mapping($handle, string $version, int $mapping_type = SPINYARN_YARN) {}
 
 /**
- * Library version string (e.g. "0.9.0").
+ * Library version string (e.g. "1.0.0-pre.1").
  *
  * @return string
  */

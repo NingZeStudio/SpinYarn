@@ -4,7 +4,7 @@
 > 审查范围：全仓库源码（38 文件，约 4981 行）——Rust（workspace 三 crate）、C（PHP 扩展）、Shell、Python、CI 配置
 > 排除：`target/`、`.git/`、`mappings/`（运行时下载）、`tests/snapshots/`（生成物）、`tests/fixtures/`（测试数据）
 > 技术栈：Rust 2021 + Cargo workspace（resolver=2）；Axum 0.7 + Tokio 1（Web API）；纯同步核心库 + C ABI（cdylib）+ PHP 8 扩展（Zend API）
-> 版本：v0.9.0（工作区干净）
+> 版本：v1.0.0-pre.1（工作区干净）
 
 ---
 

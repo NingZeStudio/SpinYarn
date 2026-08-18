@@ -2,7 +2,9 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
-## [v0.9.0] - 2026-08-18
+## [v1.0.0-pre.1] - 2026-08-18
+
+> 首个 pre-release：Web API 与 C ABI/PHP 扩展双产物交付，核心引擎稳定。本条目整合了自 v0.3.4 以来的全部开发变更（中间版本 0.9.0 未对外发布）。
 
 ### 架构重构：Web API 与 C ABI 双产物
 - **Workspace 化**：核心逻辑抽离为 `spinyarn-core`（`crates/core/`，纯 Rust 同步库，无 axum/tokio/utoipa 依赖）；根 package 保留 Axum Web API（`src/`），`src/lib.rs` 通过 `pub use spinyarn_core::{...}` re-export 核心，集成测试/bench 的 `spinyarn::mapping::...` 引用零改动
@@ -34,6 +36,9 @@
 - **config.m4 依赖预检**：缺库/头文件时 `AC_MSG_ERROR` 提前报错，构建失败信息友好
 - **OpenAPI 版本号同步**：`info(version = "0.9.0")` 占位符更新
 - clippy 全仓清零（含历史遗留 `&*shared` ×2）
+
+### 文档
+- `docs/API.md` 重写为完整接入文档，覆盖 Web API、C ABI、PHP 扩展三种对接方式；`README.md` 精简重复内容并指向 docs
 
 ## [v0.3.4] - 2026-08-17
 

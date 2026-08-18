@@ -4,7 +4,7 @@
 extern zend_module_entry spinyarn_module_entry;
 #define phpext_spinyarn_ptr &spinyarn_module_entry
 
-#define PHP_SPINYARN_VERSION "0.9.0"
+#define PHP_SPINYARN_VERSION "1.0.0-pre.1"
 
 #if defined(ZTS) && defined(COMPILE_DL_SPINYARN)
 ZEND_TSRMLS_CACHE_EXTERN()
