@@ -2,6 +2,28 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [v0.9.0] - 2026-08-18
+
+### 架构重构：Web API 与 C ABI 双产物
+- **Workspace 化**：核心逻辑抽离为 `spinyarn-core`（`crates/core/`，纯 Rust 同步库，无 axum/tokio/utoipa 依赖）；根 package 保留 Axum Web API（`src/`），`src/lib.rs` 通过 `pub use spinyarn_core::{...}` re-export 核心，集成测试/bench 的 `spinyarn::mapping::...` 引用零改动
+- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露同步方法 `deobfuscate()`（透传→自动下载→缓存→加载→反混淆）、`load_mapping()`、`has_mapping()`、`cache_stats()`，作为 C ABI 与任何嵌入宿主的统一入口
+- **`Config::from_file(path)`**：显式路径加载配置，解析失败回退默认（供 C ABI 使用，避免 `exe_dir()` 落到宿主进程）
+
+### C ABI 共享库（crates/capi/）
+- 新增 `spinyarn-capi`（cdylib + staticlib），头文件 `crates/capi/include/spinyarn.h`
+- 导出：`spinyarn_init`/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
+- 所有 `extern "C"` 函数 `catch_unwind` 防 panic 跨 FFI 边界（UB）；句柄/结果用 `Box::into_raw` + 显式 free；NULL 参数安全
+
+### PHP 8 扩展（crates/php/）
+- 新增 PHP 扩展（`config.m4` + `spinyarn.c` + `php_spinyarn.h`），链接 `libspinyarn_capi`
+- 函数：`spinyarn_init(?string $config_path)` → resource；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
+- handle 为 PHP resource，析构自动 `spinyarn_free`
+
+### 变更
+- `download.rs::is_valid_version` 从 `pub(crate)` 提升为 `pub`（跨 crate 供 Web API 层路径穿越校验）
+- `CacheStats` 的 `utoipa::ToSchema` 派生改为可选 feature `utoipa`（core 默认不依赖 utoipa）
+- CI/Release 改为 `cargo build --workspace`，Release 双产物打包（binary + cdylib，Windows 为 `.dll`）
+
 ## [v0.3.4] - 2026-08-17
 
 ### 新增

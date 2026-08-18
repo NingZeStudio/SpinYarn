@@ -1,6 +1,11 @@
 # SpinYarn
 
-Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映射表，将混淆堆栈追踪（`class_XXX` / `method_XXX` / `field_XXX`）转换为可读名称。作为 LogShare 的替代反混淆层。
+Rust 编写的 Minecraft 日志反混淆引擎，以两个独立构建产物交付：
+
+1. **`spinyarn`**——Web API 服务（Axum + Tokio）
+2. **`libspinyarn_capi`**——C ABI 共享库，供 PHP 等宿主语言嵌入（含 `crates/php/` PHP 8 扩展）
+
+利用 Fabric Yarn 映射表，将混淆堆栈追踪（`class_XXX` / `method_XXX` / `field_XXX`）转换为可读名称。作为 LogShare 的替代反混淆层。
 
 ## 特性
 
@@ -19,12 +24,49 @@ Rust 编写的 Minecraft 日志反混淆 Web API 服务。利用 Fabric Yarn 映
 
 ## 快速开始
 
-### 构建
+### 构建（Web API）
 
 ```bash
-# 编译（~6MB 二进制）
+# 编译 Web API（~6MB 二进制）
 cargo build --release
 ```
+
+### 构建（C ABI 共享库）
+
+```bash
+# 编译 C ABI 库：libspinyarn_capi.so（+ .a 静态库）
+cargo build --release -p spinyarn-capi
+# 头文件：crates/capi/include/spinyarn.h
+```
+
+### PHP 扩展（crates/php/）
+
+PHP 8（NTS）。用 phpize 构建：
+
+```bash
+cd crates/php
+phpize && ./configure --enable-spinyarn --with-spinyarn-libdir=../../target/release
+make
+```
+
+无 phpize/autoconf 环境可手动编译：
+
+```bash
+cd crates/php
+gcc -shared -fPIC -O2 -DCOMPILE_DL_SPINYARN $(php-config --includes) \
+  -I ../capi/include spinyarn.c -o spinyarn.so \
+  -L ../../target/release -lspinyarn_capi
+```
+
+加载与调用（运行时需 `LD_LIBRARY_PATH` 指向 cdylib）：
+
+```php
+$handle = spinyarn_init('/etc/spinyarn/config.toml'); // 可省略参数
+$r = spinyarn_deobfuscate($handle, $log, '1.21.9', SPINYARN_YARN);
+// $r = ['deobfuscated' => ..., 'classes_mapped' => 1, 'methods_mapped' => 1, ...]
+```
+
+PHP 函数：`spinyarn_init` / `spinyarn_deobfuscate` / `spinyarn_load_mapping` / `spinyarn_has_mapping` / `spinyarn_version`；常量 `SPINYARN_YARN` / `SPINYARN_VANILLA`。handle 是 PHP resource，析构自动释放。
 
 ### 部署与运行
 
@@ -150,9 +192,9 @@ curl -X POST /api/v1/mappings/load -H 'Content-Type: application/json' \
 ## 测试
 
 ```bash
-cargo test          # 30 个单元测试（解析 + 引擎 + 缓存 + 快照回归）
-bash test.sh        # 8 个集成场景（需先构建 release 二进制）
-cargo bench         # 基准测试（引擎吞吐：堆栈/非堆栈/真实/5MB 噪声）
+cargo test --workspace # 单元测试（core/capi/bin 各 crate + 集成 tests/）
+bash test.sh           # 集成场景（需先构建 release 二进制）
+cargo bench            # 基准测试（引擎吞吐：堆栈/非堆栈/真实/5MB 噪声）
 ```
 
 真实日志样本：`tests/fixtures/1.21.9-crash.log`、`tests/fixtures/1.21.11-fcl.log.txt`。
@@ -160,15 +202,18 @@ cargo bench         # 基准测试（引擎吞吐：堆栈/非堆栈/真实/5MB 
 ## 架构
 
 ```
-POST /api/v1/deobfuscate        # JSON 响应（deobfuscated + stats）
-POST /api/v1/deobfuscate/plain  # text/plain 响应（完整反混淆日志）
-  → spawn_blocking（受并发限流信号量约束）
-  → load_mappings(version)    # 嵌入式表 → 外部目录 → 透传
-  → 解析 v1/v2 → 4 张全局 HashMap（classes/methods/fields/nested）
-  → LineEngine：
-      堆栈行 → 手写 memchr 解析 + 查表替换
-      非堆栈行 → 快速过滤 → 合并正则兜底
-  → 返回，释放
+Cargo workspace
+├── spinyarn (binary)          # Axum Web API
+│     POST /api/v1/deobfuscate        # JSON 响应（deobfuscated + stats）
+│     POST /api/v1/deobfuscate/plain  # text/plain 响应
+│       → spawn_blocking（受并发限流信号量约束）→ spinyarn_core
+├── crates/core                # spinyarn-core（纯 Rust 同步库）
+│     Spinyarn 门面：deobfuscate/load_mapping/has_mapping
+│       → load_mappings(version)  # 外部目录 → 自动下载 → 透传
+│       → 解析 v1/v2 → 4 张全局 HashMap（classes/methods/fields/nested）
+│       → LineEngine / VanillaEngine
+├── crates/capi                # spinyarn-capi（cdylib，C ABI）
+└── crates/php                 # PHP 8 扩展（链接 libspinyarn_capi）
 ```
 
 详见 `AGENTS.md`（维护约定）。

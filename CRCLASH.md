@@ -4,7 +4,7 @@
 > 审查范围：`src/`（19 文件，约 3060 行）、`tests/`（4 文件）、`benches/`（1 文件）Rust 源码；配置（Cargo.toml、test.sh、scripts/、.github/workflows、docs/）
 > 排除：`target/`、`.git/`、`mappings/`（已移出 git，运行时下载）
 > 技术栈：Rust 2021 + Axum 0.7 + Tokio 1；serde/serde_json、tower-http、regex、tracing、flate2、ureq、utoipa、criterion
-> 版本：v0.3.4（工作区干净，基于上一轮 CR 修复后的最终提交）
+> 版本：v0.9.0（工作区干净，基于上一轮 CR 修复后的最终提交）
 
 ---
 
@@ -34,18 +34,18 @@
 |---|------|------|------|
 | G1 | `src/main.rs:31-43` | **bootstrap 下载失败被 `.ok().and_then(...).unwrap_or(false)` 静默吞掉** | `ensure_mapping`/`ensure_vanilla_mapping` 的 `Err`（网络错误等）与 `Ok(false)`（无官方映射）都被压成 `false`，仅靠函数内部日志区分。且 yarn 失败有 `warn`，**vanilla 失败完全无日志**（`if vanilla { info }` 无 else 分支），运维时无法得知 vanilla 下载失败 |
 | G2 | `src/api/deobfuscate.rs:109,149` | **clippy 告警：`&*shared` 冗余解引用** | `dispatcher::deobfuscate(&*shared, ...)` 应写 `&shared`（`shared` 已是 `Arc`，自动 deref）。两处，属历史遗留 |
-| G3 | `src/mapping/download.rs:142-152` | **`unique_tmp` 用纳秒时间戳，极端并发下仍可能碰撞** | 纳秒级时间戳在同进程极高并发（同一纳秒内两次下载同版本）时可能相同，`with_file_name` 生成的 tmp 路径会冲突。概率极低但非零；建议叠加原子计数器 |
-| G4 | `src/mapping/vanilla.rs:19` | **clippy 告警：复杂类型** | `HashMap<String, HashMap<String, Vec<(u32, u32, String)>>>` 未抽 type 别名。历史遗留，可读性欠佳 |
+| G3 | `crates/core/src/mapping/download.rs:142-152` | **`unique_tmp` 用纳秒时间戳，极端并发下仍可能碰撞** | 纳秒级时间戳在同进程极高并发（同一纳秒内两次下载同版本）时可能相同，`with_file_name` 生成的 tmp 路径会冲突。概率极低但非零；建议叠加原子计数器 |
+| G4 | `crates/core/src/mapping/vanilla.rs:19` | **clippy 告警：复杂类型** | `HashMap<String, HashMap<String, Vec<(u32, u32, String)>>>` 未抽 type 别名。历史遗留，可读性欠佳 |
 
 ### 🟢 建议
 
 | # | 位置 | 问题 | 说明 |
 |---|------|------|------|
-| C1 | `src/mapping/download.rs` | **崩溃残留的 `.tmp.*` 文件不会被清理** | `unique_tmp` 生成 `1.21.9.tiny.gz.tmp.<ts>`，若进程在 write 后、rename 前崩溃，残留 tmp 文件永久滞留。`mappings_dir_empty` 只看 `.tiny.gz`/`.txt` 结尾，残留 tmp 不影响判空，但会污染目录。建议启动时或下载前清理 |
-| C2 | `src/mapping/download.rs:290-304` | **`VANILLA_MANIFEST_CACHE` 全局 `Mutex`，锁粒度粗** | `launcher_manifest()` 持锁时若命中直接返回（快）；但刷新时会**在持锁期间执行网络请求** `fetch_launcher_manifest()`（最长 20s 超时），并发 vanilla 下载会全部阻塞在锁上等待。建议网络请求在锁外完成，仅写入时短暂持锁 |
+| C1 | `crates/core/src/mapping/download.rs` | **崩溃残留的 `.tmp.*` 文件不会被清理** | `unique_tmp` 生成 `1.21.9.tiny.gz.tmp.<ts>`，若进程在 write 后、rename 前崩溃，残留 tmp 文件永久滞留。`mappings_dir_empty` 只看 `.tiny.gz`/`.txt` 结尾，残留 tmp 不影响判空，但会污染目录。建议启动时或下载前清理 |
+| C2 | `crates/core/src/mapping/download.rs:290-304` | **`VANILLA_MANIFEST_CACHE` 全局 `Mutex`，锁粒度粗** | `launcher_manifest()` 持锁时若命中直接返回（快）；但刷新时会**在持锁期间执行网络请求** `fetch_launcher_manifest()`（最长 20s 超时），并发 vanilla 下载会全部阻塞在锁上等待。建议网络请求在锁外完成，仅写入时短暂持锁 |
 | C3 | `src/api/mappings.rs:279-291` | **`safe_local_path` 的 canonicalize 失败语义混同** | `candidate.canonicalize()` 失败统一返回 `NotFound("local mapping file not found")`，但"mappings 目录本身不存在"（应 Internal）与"目标文件不存在"（应 NotFound）被混为一谈。功能正确，语义可更精确 |
 | C4 | `src/api/mappings.rs:66-88` | **`load_mapping` 成功与否靠 `ok: bool` 表达，HTTP 恒 200** | 版本非法、源不可用、下载失败均返回 `ok: false` 的 200 响应。调用方需检查 `data.ok`，语义隐晦。可考虑对"版本不可下载"返回 4xx |
-| C5 | `src/config.rs:90-105` | **`default_bootstrap_versions` 硬编码 43 版本与脚本重复** | 已加"与 `scripts/download_mappings.sh` 同步"注释缓解，但仍有两处清单需人工同步；新增版本时易漏改一侧。可考虑由脚本生成 Rust 常量或单测断言一致性 |
+| C5 | `crates/core/src/config.rs:90-105` | **`default_bootstrap_versions` 硬编码 43 版本与脚本重复** | 已加"与 `scripts/download_mappings.sh` 同步"注释缓解，但仍有两处清单需人工同步；新增版本时易漏改一侧。可考虑由脚本生成 Rust 常量或单测断言一致性 |
 
 ---
 

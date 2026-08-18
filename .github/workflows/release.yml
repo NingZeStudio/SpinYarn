@@ -59,7 +59,7 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --workspace --target ${{ matrix.target }}
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
@@ -69,8 +69,10 @@ jobs:
           mkdir -p dist
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp "target/${{ matrix.target }}/release/spinyarn.exe" "dist/spinyarn-${{ matrix.name }}.exe"
+            cp "target/${{ matrix.target }}/release/spinyarn_capi.dll" "dist/spinyarn_capi-${{ matrix.name }}.dll"
           else
             cp "target/${{ matrix.target }}/release/spinyarn" "dist/spinyarn-${{ matrix.name }}"
+            cp "target/${{ matrix.target }}/release/libspinyarn_capi.so" "dist/libspinyarn_capi-${{ matrix.name }}.so"
           fi
           chmod +x "dist/spinyarn-${{ matrix.name }}"* 2>/dev/null || true
           # Mappings are not shipped: the binary backfills them on first startup

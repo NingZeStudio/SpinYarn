@@ -1139,21 +1139,41 @@ dependencies = [
 
 [[package]]
 name = "spinyarn"
-version = "0.3.4"
+version = "0.9.0"
 dependencies = [
  "axum",
  "criterion",
+ "flate2",
+ "serde",
+ "serde_json",
+ "spinyarn-core",
+ "thiserror",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+]
+
+[[package]]
+name = "spinyarn-capi"
+version = "0.9.0"
+dependencies = [
+ "spinyarn-core",
+]
+
+[[package]]
+name = "spinyarn-core"
+version = "0.9.0"
+dependencies = [
  "flate2",
  "once_cell",
  "regex",
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
  "toml",
- "tower-http",
  "tracing",
- "tracing-subscriber",
  "ureq",
  "utoipa",
 ]

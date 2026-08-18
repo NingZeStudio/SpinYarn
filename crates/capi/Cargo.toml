@@ -1,0 +1,12 @@
+[package]
+name = "spinyarn-capi"
+version = "0.9.0"
+edition = "2021"
+description = "SpinYarn C ABI 共享库，供 PHP 扩展等宿主语言嵌入"
+
+[lib]
+name = "spinyarn_capi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+spinyarn-core = { path = "../core" }

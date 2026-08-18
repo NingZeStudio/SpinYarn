@@ -56,7 +56,7 @@ fn bundled_path(mappings_dir: &str, version: &str) -> PathBuf {
 /// Rejects path separators and `..` to prevent path traversal, e.g.
 /// `version = "../../etc/passwd"`. Call before any path built from a
 /// user-supplied version (API endpoints and the mapping dispatcher).
-pub(crate) fn is_valid_version(version: &str) -> bool {
+pub fn is_valid_version(version: &str) -> bool {
     let first = version.as_bytes().first();
     !version.is_empty()
         && version.len() <= 64

@@ -29,7 +29,8 @@ struct Inner {
     evictions: u64,
 }
 
-#[derive(Clone, serde::Serialize, utoipa::ToSchema)]
+#[derive(Clone, serde::Serialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CacheStats {
     pub enabled: bool,
     pub entries: usize,

@@ -212,4 +212,26 @@ impl Config {
         tracing::info!("No config file found, using defaults");
         default
     }
+
+    /// Load a config from an explicit file path, falling back to defaults on
+    /// any error (never panics). Used by the C ABI, where the host process
+    /// executable is not SpinYarn and thus `exe_dir()` would be meaningless.
+    pub fn from_file(path: &str) -> Self {
+        match std::fs::read_to_string(path) {
+            Ok(content) => match toml::from_str(&content) {
+                Ok(config) => {
+                    tracing::info!("Loaded config from {}", path);
+                    config
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to parse {}: {}; using defaults", path, e);
+                    Self::default()
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Failed to read {}: {}; using defaults", path, e);
+                Self::default()
+            }
+        }
+    }
 }

@@ -30,13 +30,13 @@ jobs:
           bash scripts/download_mappings.sh 1.21.9 1.21.11 1.18.2-pre1 1.21.3 1.21.4 1.14.4
 
       - name: Check
-        run: cargo check --all-targets
+        run: cargo check --workspace --all-targets
 
       - name: Test
-        run: cargo test --all-targets
+        run: cargo test --workspace --all-targets
 
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --workspace
 
       - name: Integration Tests
         run: |

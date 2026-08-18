@@ -1,6 +1,29 @@
 # Rust build artifacts
 /target
 
+# PHP extension build artifacts (crates/php/)
+crates/php/*.so
+crates/php/build/
+crates/php/.libs/
+crates/php/Makefile
+crates/php/configure
+crates/php/configure.ac
+crates/php/config.h
+crates/php/config.h.in
+crates/php/config.status
+crates/php/config.guess
+crates/php/config.sub
+crates/php/libtool
+crates/php/ltmain.sh
+crates/php/modules/
+crates/php/autom4te.cache/
+crates/php/acinclude.m4
+crates/php/aclocal.m4
+crates/php/run-tests.php
+crates/php/*.lo
+crates/php/*.la
+crates/php/.deps/
+
 # Copied binary (single-file deployment convenience)
 /spinyarn
 
