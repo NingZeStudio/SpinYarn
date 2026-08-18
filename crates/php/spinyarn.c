@@ -48,17 +48,20 @@ static spinyarn_handle_t *fetch_handle(zval *z)
  * PHP functions
  * --------------------------------------------------------------------- */
 
-/* spinyarn_init(?string $config_path = null): resource */
+/* spinyarn_init(?string $mappings_dir = null, bool $auto_download = true): resource */
 PHP_FUNCTION(spinyarn_init)
 {
-    zend_string *config_path = NULL;
+    zend_string *mappings_dir = NULL;
+    bool auto_download = true;
 
-    ZEND_PARSE_PARAMETERS_START(0, 1)
+    ZEND_PARSE_PARAMETERS_START(0, 2)
         Z_PARAM_OPTIONAL
-        Z_PARAM_STR_OR_NULL(config_path)
+        Z_PARAM_STR_OR_NULL(mappings_dir)
+        Z_PARAM_BOOL(auto_download)
     ZEND_PARSE_PARAMETERS_END();
 
-    spinyarn_handle_t *handle = spinyarn_init(config_path ? ZSTR_VAL(config_path) : NULL);
+    spinyarn_handle_t *handle = spinyarn_init(
+        mappings_dir ? ZSTR_VAL(mappings_dir) : NULL, auto_download ? 1 : 0);
     if (handle == NULL) {
         php_error_docref(NULL, E_WARNING, "failed to initialize Spinyarn");
         RETURN_FALSE;
@@ -175,7 +178,8 @@ PHP_FUNCTION(spinyarn_version)
  * --------------------------------------------------------------------- */
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_init, 0, 0, 0)
-    ZEND_ARG_TYPE_INFO(0, config_path, IS_STRING, 1)
+    ZEND_ARG_TYPE_INFO(0, mappings_dir, IS_STRING, 1)
+    ZEND_ARG_TYPE_INFO(0, auto_download, _IS_BOOL, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_deobfuscate, 0, 0, 3)

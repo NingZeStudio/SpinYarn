@@ -6,17 +6,16 @@
 
 ### 架构重构：Web API 与 C ABI 双产物
 - **Workspace 化**：核心逻辑抽离为 `spinyarn-core`（`crates/core/`，纯 Rust 同步库，无 axum/tokio/utoipa 依赖）；根 package 保留 Axum Web API（`src/`），`src/lib.rs` 通过 `pub use spinyarn_core::{...}` re-export 核心，集成测试/bench 的 `spinyarn::mapping::...` 引用零改动
-- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露同步方法 `deobfuscate()`（透传→自动下载→缓存→加载→反混淆）、`load_mapping()`、`has_mapping()`、`cache_stats()`，作为 C ABI 与任何嵌入宿主的统一入口
-- **`Config::from_file(path)`**：显式路径加载配置，解析失败回退默认（供 C ABI 使用，避免 `exe_dir()` 落到宿主进程）；相对路径的 `maven.mappings_dir` **相对 config 文件所在目录解析**（config 放 PHP 项目根目录、映射目录写相对路径即可随项目定位）
+- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露同步方法 `deobfuscate()`（透传→自动下载→缓存→加载→反混淆）、`load_mapping()`、`has_mapping()`、`cache_stats()`，作为 C ABI 与任何嵌入宿主的统一入口；另有 `from_settings(mappings_dir, auto_download)` 从显式设置构建（无需 Config）
 
 ### C ABI 共享库（crates/capi/）
 - 新增 `spinyarn-capi`（cdylib + staticlib），头文件 `crates/capi/include/spinyarn.h`
-- 导出：`spinyarn_init`/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
+- 导出：`spinyarn_init`（mappings_dir 指针 + auto_download 整型，**无配置文件**）/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
 - 所有 `extern "C"` 函数 `catch_unwind` 防 panic 跨 FFI 边界（UB）；句柄/结果用 `Box::into_raw` + 显式 free；NULL 参数安全
 
 ### PHP 8 扩展（crates/php/）
 - 新增 PHP 扩展（`config.m4` + `spinyarn.c` + `php_spinyarn.h`），链接 `libspinyarn_capi`
-- 函数：`spinyarn_init(?string $config_path)` → resource；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
+- 函数：`spinyarn_init(?string $mappings_dir = null, bool $auto_download = true)` → resource；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
 - handle 为 PHP resource，析构自动 `spinyarn_free`
 
 ### 变更

@@ -21,11 +21,13 @@ typedef enum {
 } spinyarn_mapping_type_t;
 
 /*
- * Create an engine from a config path. Pass NULL to use the built-in defaults
- * (mappings dir from SPINYARN_MAPPINGS_DIR or <exe>/mappings, auto_download
- * on). Returns NULL on failure.
+ * Create an engine from explicit settings (no config file).
+ * - `mappings_dir`: directory holding the mapping files. Pass NULL to fall back
+ *   to SPINYARN_MAPPINGS_DIR or <exe>/mappings.
+ * - `auto_download`: 1 to download missing mappings on demand, 0 to disable.
+ * Returns NULL on failure.
  */
-spinyarn_handle_t *spinyarn_init(const char *config_path);
+spinyarn_handle_t *spinyarn_init(const char *mappings_dir, int auto_download);
 
 /* Release the engine and all associated resources. */
 void spinyarn_free(spinyarn_handle_t *handle);

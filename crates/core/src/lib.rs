@@ -50,6 +50,18 @@ impl Spinyarn {
         }
     }
 
+    /// Build an engine from explicit settings (no config file). Used by the
+    /// C ABI, where the host process executable is not SpinYarn and a config
+    /// file is unnecessary: the caller supplies the mappings dir and the
+    /// auto-download toggle directly. The LRU cache uses its defaults (on).
+    pub fn from_settings(mappings_dir: &str, auto_download: bool) -> Self {
+        Spinyarn {
+            mappings_dir: mappings_dir.to_string(),
+            auto_download,
+            cache: Some(Arc::new(cache::Cache::new(config::CacheConfig::default()))),
+        }
+    }
+
     /// Deobfuscate `content` against `version`/`mapping_type`.
     ///
     /// Pass-through behaviour matches the HTTP API: an unsupported/unavailable

@@ -18,7 +18,7 @@ spinyarn (根 package：Axum Web API binary)
 └── crates/php/          # PHP 8 扩展（C 源码，config.m4 + spinyarn.c，非 cargo 成员）
 ```
 - **`spinyarn-core`**（无 tokio/axum/utoipa 依赖，纯同步）：`config`/`cache`/`mapping`/`deobfuscator` 四大模块 + **`Spinyarn` 门面类型**（`crates/core/src/lib.rs`）——持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露同步方法 `deobfuscate()`（透传→自动下载→缓存→加载→反混淆）、`load_mapping()`、`has_mapping()`、`cache_stats()`。这是 C ABI 与任何嵌入宿主的统一入口
-- **`spinyarn-capi`**（`crates/capi/src/lib.rs`）：`#[no_mangle] extern "C"` 函数，全部 `catch_unwind` 防 panic 跨 FFI 边界（UB）。句柄/结果用 `Box::into_raw` 指针 + 显式 free。默认 config 用 `Config::default()`，或 `spinyarn_init(config_path)` 传显式路径（`Config::from_file` 解析失败回退默认）
+- **`spinyarn-capi`**（`crates/capi/src/lib.rs`）：`#[no_mangle] extern "C"` 函数，全部 `catch_unwind` 防 panic 跨 FFI 边界（UB）。句柄/结果用 `Box::into_raw` 指针 + 显式 free。**无配置文件**——`spinyarn_init(mappings_dir, auto_download)` 直接传映射目录（NULL 则回退 `SPINYARN_MAPPINGS_DIR`/`exe_dir()`）与自动下载开关，LRU cache 用默认值
 - **`spinyarn`（binary）**：`src/lib.rs` 用 `pub use spinyarn_core::{...}` re-export 核心，`src/api/` 保持不变（`crate::mapping::...` 等路径经 re-export 解析），集成测试/bench 的 `spinyarn::mapping::...` 引用因此无需改动
 
 - **无缓存模型（基础）+ LRU 缓存（默认开启）**：无缓存时每次调用独立加载映射 → 反混淆 → 释放（单版本解析表实测 ~10MB）。`[cache]` 段启用**有界 LRU**（`crates/core/src/cache.rs`，默认 `max_entries=44`/高水位 40/低水位 30，**共享缓存池**——Yarn/Vanilla 映射同池缓存，key 为 `version+mapping_type`）：解析后表以 `Arc<LoadedMappings>` 缓存，高水位触发批量淘汰至低水位，缓存大小在低~高水位间波动（避免长期满载）；命中请求跳过加载（热请求 ~6ms）且不占并发信号量。实测：缓存水位 30~40 条目 ≈ 300~400MB（服务器内存可承受）；命中/驱逐/条目数经 `/health` 暴露
@@ -41,11 +41,11 @@ spinyarn (根 package：Axum Web API binary)
 - 默认映射目录 = **二进制同级 `./mappings/`**（`std::env::current_exe()` 定位，不依赖工作目录）；`config.toml` 的 `maven.mappings_dir` 或 `SPINYARN_MAPPINGS_DIR` 可覆盖
 - **部署即运行，无需预下载映射**：Web API 首次启动自动补全缺失映射（见"启动引导补全"）；C ABI 靠 `auto_download` 按需下载。Release 制品不打包 `mappings/`。如需离线/预下载，可用 `bash scripts/download_mappings.sh [版本...]`
 - 加载：外部映射目录存在即用，否则透传
-- **C ABI 注意**：`exe_dir()` 在 cdylib 下是宿主进程（如 php-fpm），默认 `mappings/` 会落到宿主可执行文件旁，通常不是期望位置——PHP 侧应通过 `spinyarn_init(config_path)` 传显式配置或设置 `SPINYARN_MAPPINGS_DIR` 环境变量
-- **C ABI 部署约定**：config 文件由 PHP 调用方通过 `spinyarn_init(config_path)` 传入，**通常放在 PHP 项目根目录**；mappings 目录**写在 config 里**（`maven.mappings_dir`）。若 `mappings_dir` 写相对路径（如 `"./mappings"`），`Config::from_file` 会**相对 config 文件所在目录解析**（而非进程 CWD），因此 config 放项目根、映射目录写相对路径即可随项目定位
+- **C ABI 注意**：`exe_dir()` 在 cdylib 下是宿主进程（如 php-fpm），默认 `mappings/` 会落到宿主可执行文件旁，通常不是期望位置——PHP 侧应通过 `spinyarn_init($mappings_dir, $auto_download)` 显式传映射目录
+- **C ABI 部署约定**：C ABI **不读配置文件**，由 PHP 调用方直接传 `spinyarn_init($mappings_dir, $auto_download)`——映射目录通常取 PHP 项目根下的相对路径（如 `__DIR__ . '/mappings'`），自动下载开关显式传入
 
 ### 配置加载
-`Config::load()` 按顺序查找：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则**在二进制同级自动生成默认 `config.toml`**（`toml::to_string_pretty` 序列化默认值，写失败仅 warn 不 panic）。另有 `Config::from_file(path)`（C ABI 用，解析失败回退默认）。配置项：`server.host`/`server.port`/`server.max_body_size`（默认 64MB，无环境变量兜底）/`server.max_concurrency`（默认 32，`SPINYARN_MAX_CONCURRENCY` 兜底）/`maven.mappings_dir`（默认二进制同级 `./mappings`，`SPINYARN_MAPPINGS_DIR` 兜底）/`maven.auto_download`（默认 true）/`maven.bootstrap_versions`（数组，默认 43 个 1.14~1.21.11 Yarn 版本）/`cache.enabled`（默认 true）/`cache.max_entries`（44）/`cache.high_watermark`（40）/`cache.low_watermark`（30）。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。
+`Config::load()` 按顺序查找：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则**在二进制同级自动生成默认 `config.toml`**（`toml::to_string_pretty` 序列化默认值，写失败仅 warn 不 panic）。配置项：`server.host`/`server.port`/`server.max_body_size`（默认 64MB，无环境变量兜底）/`server.max_concurrency`（默认 32，`SPINYARN_MAX_CONCURRENCY` 兜底）/`maven.mappings_dir`（默认二进制同级 `./mappings`，`SPINYARN_MAPPINGS_DIR` 兜底）/`maven.auto_download`（默认 true）/`maven.bootstrap_versions`（数组，默认 43 个 1.14~1.21.11 Yarn 版本）/`cache.enabled`（默认 true）/`cache.max_entries`（44）/`cache.high_watermark`（40）/`cache.low_watermark`（30）。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。
 
 ### 版本格式兼容
 `crates/core/src/mapping/tiny_v2.rs` 自动检测 v1（平铺 `CLASS`/`FIELD`/`METHOD`）和 v2（缩进 `c`/`\tf`/`\tm`）格式，列位置按头部命名空间名定位（兼容 1.14 特殊列序）。
@@ -58,8 +58,8 @@ spinyarn (根 package：Axum Web API binary)
 - **Yarn 数据限制**：约 1/3 方法/字段 named 列即 `method_XXXX` 自身（社区未命名，1.21.9 达 34%），无法反混淆；类命名基本完整（0.5% 未命名）。统计见 `docs/yarn_unmapped_stats.csv`
 
 ### C ABI / PHP 扩展
-- C 头文件 `crates/capi/include/spinyarn.h`：`spinyarn_init`/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度，无需 NUL 结尾）/`spinyarn_result_*`（text/len/classes/methods/fields/time_ms）/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
-- PHP 扩展 `crates/php/`（PHP 8，NTS）：函数 `spinyarn_init(?string $config_path)` → resource；`spinyarn_deobfuscate($handle, $content, $version, $mapping_type=SPINYARN_YARN)` → assoc array（`deobfuscated`/`classes_mapped`/`methods_mapped`/`fields_mapped`/`total_time_ms`）；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN=0`/`SPINYARN_VANILLA=1`。handle 为 PHP resource，析构自动 `spinyarn_free`（无需手动 free）
+- C 头文件 `crates/capi/include/spinyarn.h`：`spinyarn_init`（mappings_dir 指针 + auto_download 整型，无配置文件）/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度，无需 NUL 结尾）/`spinyarn_result_*`（text/len/classes/methods/fields/time_ms）/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
+- PHP 扩展 `crates/php/`（PHP 8，NTS）：函数 `spinyarn_init(?string $mappings_dir = null, bool $auto_download = true)` → resource；`spinyarn_deobfuscate($handle, $content, $version, $mapping_type=SPINYARN_YARN)` → assoc array（`deobfuscated`/`classes_mapped`/`methods_mapped`/`fields_mapped`/`total_time_ms`）；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN=0`/`SPINYARN_VANILLA=1`。handle 为 PHP resource，析构自动 `spinyarn_free`（无需手动 free）
 - 构建：`config.m4` 用 phpize/autoconf（`SPINYARN_LIBDIR` 指向 `target/release`）；无 phpize 环境可手动 `gcc -shared -fPIC $(php-config --includes) -I ../capi/include spinyarn.c -o spinyarn.so -L ../../target/release -lspinyarn_capi`，运行需 `LD_LIBRARY_PATH` 指向 cdylib
 
 ## 测试

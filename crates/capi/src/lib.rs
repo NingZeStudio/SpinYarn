@@ -52,29 +52,28 @@ fn to_mapping_type(t: spinyarn_mapping_type_t) -> MappingType {
     }
 }
 
-/// Build a `Config`. `config_path` NULL → defaults; otherwise the given file is
-/// parsed via `Config::from_file`, which falls back to defaults on any error.
-fn load_config(config_path: Option<&str>) -> Config {
-    match config_path {
-        None => Config::default(),
-        Some(path) => Config::from_file(path),
-    }
-}
-
 /// # Safety
-/// `config_path` must be NULL or a valid NUL-terminated C string.
+/// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
+/// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). `auto_download` is 0/1.
 #[no_mangle]
-pub extern "C" fn spinyarn_init(config_path: *const c_char) -> *mut spinyarn_handle {
+pub extern "C" fn spinyarn_init(
+    mappings_dir: *const c_char,
+    auto_download: c_int,
+) -> *mut spinyarn_handle {
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let path = if config_path.is_null() {
+        let dir = if mappings_dir.is_null() {
             None
         } else {
-            Some(unsafe { std::ffi::CStr::from_ptr(config_path) }.to_string_lossy())
+            Some(unsafe { std::ffi::CStr::from_ptr(mappings_dir) }.to_string_lossy())
         };
-        let config = load_config(path.as_deref());
-        Box::into_raw(Box::new(spinyarn_handle {
-            inner: Spinyarn::new(&config),
-        }))
+        // An explicit dir wins; otherwise fall back to Config's default
+        // (SPINYARN_MAPPINGS_DIR or the host exe's ./mappings).
+        let config = Config::default();
+        let dir = dir
+            .map(|d| d.into_owned())
+            .unwrap_or_else(|| config.maven.mappings_dir.clone());
+        let inner = Spinyarn::from_settings(&dir, auto_download != 0);
+        Box::into_raw(Box::new(spinyarn_handle { inner }))
     }));
     match result {
         Ok(handle) => handle,
@@ -295,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_init_and_passthrough() {
-        let handle = spinyarn_init(std::ptr::null());
+        let handle = spinyarn_init(std::ptr::null(), 0);
         assert!(!handle.is_null());
 
         // A non-downloadable version (snapshot) passes through unchanged.
@@ -319,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_deobfuscate_null_args() {
-        let handle = spinyarn_init(std::ptr::null());
+        let handle = spinyarn_init(std::ptr::null(), 0);
         assert!(spinyarn_deobfuscate(
             std::ptr::null_mut(),
             std::ptr::null(),
