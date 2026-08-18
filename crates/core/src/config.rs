@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Default request body limit (64MB).
 pub const DEFAULT_MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
@@ -216,8 +216,12 @@ impl Config {
     /// Load a config from an explicit file path, falling back to defaults on
     /// any error (never panics). Used by the C ABI, where the host process
     /// executable is not SpinYarn and thus `exe_dir()` would be meaningless.
+    ///
+    /// A relative `maven.mappings_dir` is resolved against the config file's
+    /// directory, not the process CWD — the config lives in the PHP project
+    /// root and `mappings_dir = "./mappings"` should resolve there.
     pub fn from_file(path: &str) -> Self {
-        match std::fs::read_to_string(path) {
+        let mut config = match std::fs::read_to_string(path) {
             Ok(content) => match toml::from_str(&content) {
                 Ok(config) => {
                     tracing::info!("Loaded config from {}", path);
@@ -232,6 +236,60 @@ impl Config {
                 tracing::warn!("Failed to read {}: {}; using defaults", path, e);
                 Self::default()
             }
-        }
+        };
+        resolve_relative_mappings_dir(&mut config, path);
+        config
+    }
+}
+
+/// Resolve a relative `maven.mappings_dir` against the config file's parent
+/// directory. Absolute paths are left untouched. Callers that build a config
+/// from an explicit path (C ABI) rely on this so `mappings_dir = "./mappings"`
+/// in a config placed at the PHP project root resolves there.
+fn resolve_relative_mappings_dir(config: &mut Config, config_path: &str) {
+    let dir = Path::new(&config.maven.mappings_dir);
+    if !dir.is_relative() {
+        return;
+    }
+    if let Some(base) = Path::new(config_path).parent() {
+        let resolved = base.join(dir);
+        tracing::debug!(
+            "resolved relative mappings_dir {} -> {}",
+            config.maven.mappings_dir,
+            resolved.display()
+        );
+        config.maven.mappings_dir = resolved.to_string_lossy().into_owned();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_relative_mappings_dir() {
+        let mut c = Config::default();
+        c.maven.mappings_dir = "./mappings".to_string();
+        resolve_relative_mappings_dir(&mut c, "/var/www/project/spinyarn.toml");
+        // `.join("./mappings")` keeps the `.` segment; it is filesystem-equivalent
+        // to the normalized path.
+        assert_eq!(c.maven.mappings_dir, "/var/www/project/./mappings");
+    }
+
+    #[test]
+    fn test_resolve_absolute_mappings_dir_untouched() {
+        let mut c = Config::default();
+        c.maven.mappings_dir = "/abs/mappings".to_string();
+        resolve_relative_mappings_dir(&mut c, "/var/www/project/spinyarn.toml");
+        assert_eq!(c.maven.mappings_dir, "/abs/mappings");
+    }
+
+    #[test]
+    fn test_resolve_relative_no_parent() {
+        // Config path with no parent (bare filename) leaves the value as-is.
+        let mut c = Config::default();
+        c.maven.mappings_dir = "./mappings".to_string();
+        resolve_relative_mappings_dir(&mut c, "spinyarn.toml");
+        assert_eq!(c.maven.mappings_dir, "./mappings");
     }
 }

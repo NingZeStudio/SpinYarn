@@ -42,6 +42,7 @@ spinyarn (根 package：Axum Web API binary)
 - **部署即运行，无需预下载映射**：Web API 首次启动自动补全缺失映射（见"启动引导补全"）；C ABI 靠 `auto_download` 按需下载。Release 制品不打包 `mappings/`。如需离线/预下载，可用 `bash scripts/download_mappings.sh [版本...]`
 - 加载：外部映射目录存在即用，否则透传
 - **C ABI 注意**：`exe_dir()` 在 cdylib 下是宿主进程（如 php-fpm），默认 `mappings/` 会落到宿主可执行文件旁，通常不是期望位置——PHP 侧应通过 `spinyarn_init(config_path)` 传显式配置或设置 `SPINYARN_MAPPINGS_DIR` 环境变量
+- **C ABI 部署约定**：config 文件由 PHP 调用方通过 `spinyarn_init(config_path)` 传入，**通常放在 PHP 项目根目录**；mappings 目录**写在 config 里**（`maven.mappings_dir`）。若 `mappings_dir` 写相对路径（如 `"./mappings"`），`Config::from_file` 会**相对 config 文件所在目录解析**（而非进程 CWD），因此 config 放项目根、映射目录写相对路径即可随项目定位
 
 ### 配置加载
 `Config::load()` 按顺序查找：二进制同级 `config.toml` → 当前目录 `config.toml` → `SpinYarn.toml` → `/etc/spinyarn/config.toml`，都没找到则**在二进制同级自动生成默认 `config.toml`**（`toml::to_string_pretty` 序列化默认值，写失败仅 warn 不 panic）。另有 `Config::from_file(path)`（C ABI 用，解析失败回退默认）。配置项：`server.host`/`server.port`/`server.max_body_size`（默认 64MB，无环境变量兜底）/`server.max_concurrency`（默认 32，`SPINYARN_MAX_CONCURRENCY` 兜底）/`maven.mappings_dir`（默认二进制同级 `./mappings`，`SPINYARN_MAPPINGS_DIR` 兜底）/`maven.auto_download`（默认 true）/`maven.bootstrap_versions`（数组，默认 43 个 1.14~1.21.11 Yarn 版本）/`cache.enabled`（默认 true）/`cache.max_entries`（44）/`cache.high_watermark`（40）/`cache.low_watermark`（30）。启动时若端口已被占用，`main.rs` 自动 `port + 1` 递增重试直至找到空闲端口（`u16` 溢出保护）。

@@ -7,7 +7,7 @@
 ### 架构重构：Web API 与 C ABI 双产物
 - **Workspace 化**：核心逻辑抽离为 `spinyarn-core`（`crates/core/`，纯 Rust 同步库，无 axum/tokio/utoipa 依赖）；根 package 保留 Axum Web API（`src/`），`src/lib.rs` 通过 `pub use spinyarn_core::{...}` re-export 核心，集成测试/bench 的 `spinyarn::mapping::...` 引用零改动
 - **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露同步方法 `deobfuscate()`（透传→自动下载→缓存→加载→反混淆）、`load_mapping()`、`has_mapping()`、`cache_stats()`，作为 C ABI 与任何嵌入宿主的统一入口
-- **`Config::from_file(path)`**：显式路径加载配置，解析失败回退默认（供 C ABI 使用，避免 `exe_dir()` 落到宿主进程）
+- **`Config::from_file(path)`**：显式路径加载配置，解析失败回退默认（供 C ABI 使用，避免 `exe_dir()` 落到宿主进程）；相对路径的 `maven.mappings_dir` **相对 config 文件所在目录解析**（config 放 PHP 项目根目录、映射目录写相对路径即可随项目定位）
 
 ### C ABI 共享库（crates/capi/）
 - 新增 `spinyarn-capi`（cdylib + staticlib），头文件 `crates/capi/include/spinyarn.h`

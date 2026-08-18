@@ -61,9 +61,18 @@ gcc -shared -fPIC -O2 -DCOMPILE_DL_SPINYARN $(php-config --includes) \
 加载与调用（运行时需 `LD_LIBRARY_PATH` 指向 cdylib）：
 
 ```php
-$handle = spinyarn_init('/etc/spinyarn/config.toml'); // 可省略参数
+// config 文件通常放在 PHP 项目根目录，映射目录写在 config 的 maven.mappings_dir
+$handle = spinyarn_init(__DIR__ . '/spinyarn.toml');
 $r = spinyarn_deobfuscate($handle, $log, '1.21.9', SPINYARN_YARN);
 // $r = ['deobfuscated' => ..., 'classes_mapped' => 1, 'methods_mapped' => 1, ...]
+```
+
+config 文件示例（放 PHP 项目根目录，`mappings_dir` 用相对路径会相对 config 文件所在目录解析）：
+
+```toml
+[maven]
+mappings_dir = "./mappings"
+auto_download = true
 ```
 
 PHP 函数：`spinyarn_init` / `spinyarn_deobfuscate` / `spinyarn_load_mapping` / `spinyarn_has_mapping` / `spinyarn_version`；常量 `SPINYARN_YARN` / `SPINYARN_VANILLA`。handle 是 PHP resource，析构自动释放。
