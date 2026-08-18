@@ -37,6 +37,18 @@ pub struct DeobfuscateOutput {
     pub total_time_ms: f64,
 }
 
+/// Statistics for a bootstrap (full-list download) run.
+#[derive(Debug, Default, Clone, serde::Serialize)]
+pub struct BootstrapStats {
+    /// Mapping files downloaded this run.
+    pub downloaded: usize,
+    /// Mapping files already present and skipped.
+    pub skipped: usize,
+    /// Downloads that failed (network/IO error; "no official mapping" does not
+    /// count as a failure).
+    pub failed: usize,
+}
+
 impl Spinyarn {
     /// Build an engine from a loaded [`config::Config`], honouring every cache
     /// field (bound + watermarks) exactly as configured.
@@ -242,6 +254,56 @@ impl Spinyarn {
         (removed_files, removed_cache)
     }
 
+    /// Bootstrap a full version list: for each version, ensure both the Yarn
+    /// and Vanilla mapping files exist locally, downloading any that are
+    /// missing. Existing files are skipped. "No official Vanilla mapping" is
+    /// not an error. Synchronous (blocking); call from an init/deploy path, not
+    /// the hot request path.
+    pub fn bootstrap(&self, versions: &[String]) -> BootstrapStats {
+        let mut stats = BootstrapStats::default();
+        for version in versions {
+            let yarn = dispatcher::local_path(version, &self.mappings_dir, MappingType::Yarn);
+            if yarn.exists() {
+                stats.skipped += 1;
+            } else if self.auto_download {
+                match ensure_mapping(version, &self.mappings_dir, false) {
+                    Ok(true) => stats.downloaded += 1,
+                    Ok(false) => {
+                        tracing::debug!("bootstrap: {} yarn unsupported (no maven build)", version)
+                    }
+                    Err(e) => {
+                        tracing::warn!("bootstrap: {} yarn failed: {}", version, e);
+                        stats.failed += 1;
+                    }
+                }
+            }
+
+            let vanilla =
+                dispatcher::local_path(version, &self.mappings_dir, MappingType::Vanilla);
+            if vanilla.exists() {
+                stats.skipped += 1;
+            } else if self.auto_download {
+                match ensure_vanilla_mapping(version, &self.mappings_dir, false) {
+                    Ok(true) => stats.downloaded += 1,
+                    Ok(false) => tracing::debug!(
+                        "bootstrap: {} vanilla unavailable (no official mapping)",
+                        version
+                    ),
+                    Err(e) => {
+                        tracing::warn!("bootstrap: {} vanilla failed: {}", version, e);
+                        stats.failed += 1;
+                    }
+                }
+            }
+        }
+        stats
+    }
+
+    /// Bootstrap the default full version list (43 Yarn + Vanilla families).
+    pub fn bootstrap_default(&self) -> BootstrapStats {
+        self.bootstrap(&config::default_bootstrap_versions())
+    }
+
     fn passthrough(content: &str) -> DeobfuscateOutput {
         DeobfuscateOutput {
             deobfuscated: content.to_string(),
@@ -321,5 +383,41 @@ mod tests {
         let out = s.deobfuscate("at a.b(X.java:1)", "25w44a", MappingType::Yarn);
         assert_eq!(out.deobfuscated, "at a.b(X.java:1)");
         assert_eq!(out.classes_mapped, 0);
+    }
+
+    #[test]
+    fn test_bootstrap_skips_existing_files() {
+        let dir = std::env::temp_dir().join(format!("spinyarn-bootstrap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // Pre-place both a Yarn and a Vanilla mapping for 1.21.9.
+        std::fs::write(dir.join("1.21.9.tiny.gz"), b"garbage").unwrap();
+        std::fs::create_dir_all(dir.join("vanilla")).unwrap();
+        std::fs::write(dir.join("vanilla").join("1.21.9.txt"), b"garbage").unwrap();
+
+        // auto_download = false so nothing is fetched; both files exist -> skipped.
+        let s = Spinyarn::from_settings(dir.to_str().unwrap(), false);
+        let stats = s.bootstrap(&["1.21.9".to_string()]);
+        assert_eq!(stats.skipped, 2);
+        assert_eq!(stats.downloaded, 0);
+        assert_eq!(stats.failed, 0);
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_bootstrap_no_download_when_disabled() {
+        let dir = std::env::temp_dir().join(format!("spinyarn-bootstrap-off-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // auto_download = false and no files present -> nothing happens, no failures.
+        let s = Spinyarn::from_settings(dir.to_str().unwrap(), false);
+        let stats = s.bootstrap(&["1.21.9".to_string()]);
+        assert_eq!(stats.downloaded, 0);
+        assert_eq!(stats.failed, 0);
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

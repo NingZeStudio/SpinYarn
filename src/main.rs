@@ -1,55 +1,26 @@
 use spinyarn::api::build_router;
 use spinyarn::config::Config;
-use spinyarn::mapping::dispatcher::{self, MappingType};
-use spinyarn::mapping::download::{ensure_mapping, ensure_vanilla_mapping};
-use spinyarn::START_TIME;
-use std::path::Path;
+use spinyarn::{Spinyarn, START_TIME};
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-/// Ensure a mapping file exists locally, downloading it if missing (both Yarn
-/// and Vanilla families). Runs inside a `spawn_blocking` task; missing files
-/// are backfilled, existing ones are left untouched.
-fn ensure_one(version: &str, mappings_dir: &str) {
-    let yarn = dispatcher::local_path(version, mappings_dir, MappingType::Yarn);
-    if !Path::new(&yarn).exists() {
-        match ensure_mapping(version, mappings_dir, false) {
-            Ok(true) => tracing::info!("bootstrap: {} yarn ready", version),
-            Ok(false) => tracing::warn!("bootstrap: {} yarn unsupported (no maven build)", version),
-            Err(e) => tracing::warn!("bootstrap: {} yarn failed: {}", version, e),
-        }
-    }
-
-    let vanilla = dispatcher::local_path(version, mappings_dir, MappingType::Vanilla);
-    if !Path::new(&vanilla).exists() {
-        match ensure_vanilla_mapping(version, mappings_dir, false) {
-            Ok(true) => tracing::info!("bootstrap: {} vanilla ready", version),
-            Ok(false) => tracing::debug!("bootstrap: {} vanilla unavailable (no official mapping)", version),
-            Err(e) => tracing::warn!("bootstrap: {} vanilla failed: {}", version, e),
-        }
-    }
-}
 
 /// Spawn a background bootstrap that backfills every missing mapping from the
 /// configured version list (both Yarn and Vanilla families) when
 /// `maven.auto_download` is on. Runs off the request path; the server keeps
-/// serving while it fills in.
-fn bootstrap_mappings(config: &Config) {
-    if !config.maven.auto_download {
-        return;
-    }
-    let versions = config.maven.bootstrap_versions.clone();
-    let mappings_dir = config.maven.mappings_dir.clone();
+/// serving while it fills in. Delegates to the core `Spinyarn::bootstrap`.
+fn bootstrap_mappings(spinyarn: Arc<Spinyarn>, versions: Vec<String>) {
     tokio::spawn(async move {
         tracing::info!("bootstrap: checking {} version(s)", versions.len());
-        for version in versions {
-            let dir = mappings_dir.clone();
-            let v = version.clone();
-            tokio::task::spawn_blocking(move || ensure_one(&v, &dir))
-                .await
-                .ok();
-        }
-        tracing::info!("bootstrap: done");
+        let stats = tokio::task::spawn_blocking(move || spinyarn.bootstrap(&versions))
+            .await
+            .unwrap_or_default();
+        tracing::info!(
+            "bootstrap: done (downloaded={} skipped={} failed={})",
+            stats.downloaded,
+            stats.skipped,
+            stats.failed
+        );
     });
 }
 
@@ -75,8 +46,12 @@ async fn main() {
         config.cache.high_watermark,
         config.cache.low_watermark
     );
-    bootstrap_mappings(&config);
-    let app = build_router(config.clone());
+
+    let spinyarn = Arc::new(Spinyarn::new(&config));
+    if config.maven.auto_download {
+        bootstrap_mappings(spinyarn.clone(), config.maven.bootstrap_versions.clone());
+    }
+    let app = build_router(config.clone(), spinyarn);
 
     // Bind with port-auto-increment: if the configured/default port is taken,
     // try the next one until a free port is found.

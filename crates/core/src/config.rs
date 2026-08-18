@@ -87,7 +87,7 @@ fn default_auto_download() -> bool {
 /// KEEP IN SYNC with `scripts/download_mappings.sh`'s `VERSIONS` array: when a
 /// new version ships there, add it here too (or override via `config.toml`'s
 /// `maven.bootstrap_versions`).
-fn default_bootstrap_versions() -> Vec<String> {
+pub fn default_bootstrap_versions() -> Vec<String> {
     [
         "1.14", "1.14.1", "1.14.2", "1.14.3", "1.14.4",
         "1.15", "1.15.1", "1.15.2",

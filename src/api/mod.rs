@@ -107,7 +107,7 @@ async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
     Json(api)
 }
 
-pub fn build_router(config: Config) -> Router {
+pub fn build_router(config: Config, spinyarn: Arc<Spinyarn>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -154,7 +154,7 @@ pub fn build_router(config: Config) -> Router {
         )
         .with_state(AppState {
             gate: Arc::new(Semaphore::new(config.server.max_concurrency)),
-            spinyarn: Arc::new(Spinyarn::new(&config)),
+            spinyarn,
         });
     Router::new().merge(api_routes).layer(cors)
 }

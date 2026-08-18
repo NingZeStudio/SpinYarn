@@ -202,6 +202,23 @@ PHP_FUNCTION(spinyarn_version)
     RETURN_STRING(spinyarn_version());
 }
 
+/* spinyarn_bootstrap(resource $handle): int */
+PHP_FUNCTION(spinyarn_bootstrap)
+{
+    zval *handle_z;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_RESOURCE(handle_z)
+    ZEND_PARSE_PARAMETERS_END();
+
+    spinyarn_handle_t *handle = fetch_handle(handle_z);
+    if (handle == NULL) {
+        RETURN_FALSE;
+    }
+
+    RETURN_LONG((zend_long)spinyarn_bootstrap(handle));
+}
+
 /* ------------------------------------------------------------------------
  * Arg info
  * --------------------------------------------------------------------- */
@@ -237,6 +254,10 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_version, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_bootstrap, 0, 0, 1)
+    ZEND_ARG_INFO(0, handle)
+ZEND_END_ARG_INFO()
+
 /* ------------------------------------------------------------------------
  * Function table
  * --------------------------------------------------------------------- */
@@ -247,6 +268,7 @@ static const zend_function_entry spinyarn_functions[] = {
     PHP_FE(spinyarn_load_mapping, arginfo_spinyarn_load_mapping)
     PHP_FE(spinyarn_has_mapping, arginfo_spinyarn_has_mapping)
     PHP_FE(spinyarn_version, arginfo_spinyarn_version)
+    PHP_FE(spinyarn_bootstrap, arginfo_spinyarn_bootstrap)
     PHP_FE_END
 };
 

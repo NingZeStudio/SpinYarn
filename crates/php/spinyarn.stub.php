@@ -65,3 +65,14 @@ function spinyarn_has_mapping($handle, string $version, int $mapping_type = SPIN
  * @return string
  */
 function spinyarn_version() {}
+
+/**
+ * Bootstrap the default full version list (43 Yarn + Vanilla families): download
+ * every missing mapping file into the mappings dir. Synchronous/blocking — call
+ * from an init/deploy path, not the hot request path.
+ *
+ * @param resource $handle      Handle from spinyarn_init().
+ * @return int|false            Number of mapping files downloaded (>= 0), or
+ *                              false on an invalid handle.
+ */
+function spinyarn_bootstrap($handle) {}

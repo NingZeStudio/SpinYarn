@@ -65,11 +65,15 @@ gcc -shared -fPIC -O2 -DCOMPILE_DL_SPINYARN $(php-config --includes) \
 $handle = spinyarn_init(__DIR__ . '/mappings', true);              // 默认缓存 (44/40/30)
 $handle = spinyarn_init(__DIR__ . '/mappings', true, 10, 8, 5);    // 自定义缓存水位
 $handle = spinyarn_init(__DIR__ . '/mappings', true, 0);           // 禁用 LRU 缓存
+
+// 部署/初始化阶段全量下载默认版本清单（43 Yarn + Vanilla），阻塞调用
+$downloaded = spinyarn_bootstrap($handle);
+
 $r = spinyarn_deobfuscate($handle, $log, '1.21.9', SPINYARN_YARN);
 // $r = ['deobfuscated' => ..., 'classes_mapped' => 1, 'methods_mapped' => 1, ...]
 ```
 
-PHP 函数：`spinyarn_init` / `spinyarn_deobfuscate` / `spinyarn_load_mapping` / `spinyarn_has_mapping` / `spinyarn_version`；常量 `SPINYARN_YARN` / `SPINYARN_VANILLA`。handle 是 PHP resource，析构自动释放。完整签名见 `crates/php/spinyarn.stub.php`。
+PHP 函数：`spinyarn_init` / `spinyarn_deobfuscate` / `spinyarn_load_mapping` / `spinyarn_has_mapping` / `spinyarn_bootstrap` / `spinyarn_version`；常量 `SPINYARN_YARN` / `SPINYARN_VANILLA`。handle 是 PHP resource，析构自动释放。完整签名见 `crates/php/spinyarn.stub.php`。
 
 ### 部署与运行
 

@@ -6,17 +6,17 @@
 
 ### 架构重构：Web API 与 C ABI 双产物
 - **Workspace 化**：核心逻辑抽离为 `spinyarn-core`（`crates/core/`，纯 Rust 同步库，无 axum/tokio/utoipa 依赖）；根 package 保留 Axum Web API（`src/`），`src/lib.rs` 通过 `pub use spinyarn_core::{...}` re-export 核心，集成测试/bench 的 `spinyarn::mapping::...` 引用零改动
-- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露**完整流水线** `deobfuscate()` 与**分步方法** `ensure_available()`/`get_cached()`/`load()`/`insert_cached()`/`deobfuscate_loaded()`（Web API 精确控制信号量门控），另有 `load_mapping()`/`has_mapping()`/`cache_stats()`/`unload()`；构造器 `new(&Config)`/`from_settings(dir, auto_download)`/`from_full_settings(dir, auto_download, cache_max, cache_high, cache_low)`
-- **Web API 复用门面**：`src/api/deobfuscate.rs` 的 `process` 改为委托 `Spinyarn` 分步方法，消除与 core 的流水线重复；`AppState` 改持 `Arc<Spinyarn>`
+- **新增 `Spinyarn` 门面类型**（`crates/core/src/lib.rs`）：持有 `mappings_dir`/`auto_download`/可选 LRU cache，暴露**完整流水线** `deobfuscate()` 与**分步方法** `ensure_available()`/`get_cached()`/`load()`/`insert_cached()`/`deobfuscate_loaded()`（Web API 精确控制信号量门控），另有 `load_mapping()`/`has_mapping()`/`cache_stats()`/`unload()`/`bootstrap()`/`bootstrap_default()`；构造器 `new(&Config)`/`from_settings(dir, auto_download)`/`from_full_settings(dir, auto_download, cache_max, cache_high, cache_low)`
+- **Web API 复用门面**：`src/api/deobfuscate.rs` 的 `process` 改为委托 `Spinyarn` 分步方法，消除与 core 的流水线重复；`AppState` 改持 `Arc<Spinyarn>`；启动引导补全也统一走 `Spinyarn::bootstrap`（`main.rs` 后台调用，C ABI 通过 `spinyarn_bootstrap` 显式调用）
 
 ### C ABI 共享库（crates/capi/）
 - 新增 `spinyarn-capi`（cdylib + staticlib），头文件 `crates/capi/include/spinyarn.h`
-- 导出：`spinyarn_init`（mappings_dir 指针 + auto_download 整型，**无配置文件**，默认缓存）/`spinyarn_init_full`（额外 `cache_max_entries`/`cache_high_watermark`/`cache_low_watermark`，MySQLi 风格全参数，0 = 禁用/自动）/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度，64MB 上限）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
+- 导出：`spinyarn_init`（mappings_dir 指针 + auto_download 整型，**无配置文件**，默认缓存）/`spinyarn_init_full`（额外 `cache_max_entries`/`cache_high_watermark`/`cache_low_watermark`，MySQLi 风格全参数，0 = 禁用/自动）/`spinyarn_bootstrap`（全量下载默认清单）/`spinyarn_free`/`spinyarn_deobfuscate`（content 显式长度，64MB 上限）/`spinyarn_result_*`/`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`
 - 所有 `extern "C"` 函数 `catch_unwind` 防 panic 跨 FFI 边界（UB）；句柄/结果用 `Box::into_raw` + 显式 free；NULL 参数安全；枚举判别值 `static_assert` 守护
 
 ### PHP 8 扩展（crates/php/）
 - 新增 PHP 扩展（`config.m4` + `spinyarn.c` + `php_spinyarn.h` + `spinyarn.stub.php`），链接 `libspinyarn_capi`
-- 函数：`spinyarn_init(?string $mappings_dir = null, bool $auto_download = true, int $cache_max_entries = 44, int $cache_high_watermark = 40, int $cache_low_watermark = 30)` → resource（MySQLi 风格位置参数，无需配置文件）；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
+- 函数：`spinyarn_init(?string $mappings_dir = null, bool $auto_download = true, int $cache_max_entries = 44, int $cache_high_watermark = 40, int $cache_low_watermark = 30)` → resource（MySQLi 风格位置参数，无需配置文件）；`spinyarn_deobfuscate` → assoc array；`spinyarn_load_mapping`/`spinyarn_has_mapping`/`spinyarn_bootstrap`/`spinyarn_version`；常量 `SPINYARN_YARN`/`SPINYARN_VANILLA`
 - handle 为 PHP resource，析构自动 `spinyarn_free`；`spinyarn_deobfuscate` 对 result 文本判空防御
 
 ### 变更

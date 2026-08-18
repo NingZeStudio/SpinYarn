@@ -108,6 +108,13 @@ int spinyarn_has_mapping(
 /* Library version string (e.g. "0.9.0"). */
 const char *spinyarn_version(void);
 
+/*
+ * Bootstrap the default full version list (43 Yarn + Vanilla families): download
+ * every missing mapping file. Synchronous (blocking); call from an init/deploy
+ * path, not the hot request path. Returns the number of files downloaded (>= 0).
+ */
+size_t spinyarn_bootstrap(spinyarn_handle_t *handle);
+
 #ifdef __cplusplus
 }
 #endif

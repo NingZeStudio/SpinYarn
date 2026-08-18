@@ -312,6 +312,27 @@ pub extern "C" fn spinyarn_version() -> *const c_char {
         .as_ptr()
 }
 
+/// Bootstrap the default full version list (43 Yarn + Vanilla families):
+/// download every missing mapping file. Synchronous (blocking); call from an
+/// init/deploy path, not the hot request path.
+///
+/// # Safety
+/// `handle` must be a valid pointer from `spinyarn_init`.
+///
+/// Returns the number of mapping files downloaded (>= 0), or 0 on a null handle
+/// or panic.
+#[no_mangle]
+pub extern "C" fn spinyarn_bootstrap(handle: *mut spinyarn_handle) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let handle = unsafe { &*handle };
+        handle.inner.bootstrap_default().downloaded
+    }));
+    result.unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
