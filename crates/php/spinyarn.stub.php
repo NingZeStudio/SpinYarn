@@ -47,7 +47,7 @@ function spinyarn_deobfuscate($handle, string $content, string $version, int $ma
 function spinyarn_has_mapping($handle, string $version, int $mapping_type = SPINYARN_YARN) {}
 
 /**
- * Library version string (e.g. "1.0.0-pre.2").
+ * Library version string (e.g. "1.0.0").
  *
  * @return string
  */

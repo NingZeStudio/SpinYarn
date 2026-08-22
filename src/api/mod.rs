@@ -45,7 +45,7 @@ mod response;
         title = "SpinYarn API",
         description = "Minecraft 日志反混淆服务：Fabric(Yarn) 与 Vanilla(Mojang official) 映射支持。",
         // utoipa's macro only accepts a literal here; keep in sync with Cargo.toml.
-        version = "1.0.0-pre.2"
+        version = "1.0.0"
     )
 )]
 struct ApiDoc;

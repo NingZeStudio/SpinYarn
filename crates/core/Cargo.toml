@@ -1,6 +1,6 @@
 [package]
 name = "spinyarn-core"
-version = "1.0.0-pre.2"
+version = "1.0.0"
 edition = "2021"
 description = "SpinYarn 核心库：Minecraft 日志反混淆引擎（Yarn/Vanilla），无网络栈依赖"
 

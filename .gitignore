@@ -23,12 +23,16 @@ crates/php/run-tests.php
 crates/php/*.lo
 crates/php/*.la
 crates/php/.deps/
+crates/php/Makefile.fragments
+crates/php/Makefile.objects
+crates/php/config.nice
+crates/php/configure~
+crates/php/*.dep
 
 # Copied binary (single-file deployment convenience)
 /spinyarn
 
-# Mappings are not committed; SpinYarn auto-downloads the full 43+39 set on
-# startup (see maven.auto_download). Download manually via scripts/.
+# Mappings are not committed; the host provides them (download via scripts/).
 /mappings/
 
 # ZeroTermux Editor GUI scaffold (not part of the project)

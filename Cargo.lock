@@ -922,7 +922,7 @@ dependencies = [
 
 [[package]]
 name = "spinyarn"
-version = "1.0.0-pre.2"
+version = "1.0.0"
 dependencies = [
  "axum",
  "criterion",
@@ -940,14 +940,14 @@ dependencies = [
 
 [[package]]
 name = "spinyarn-capi"
-version = "1.0.0-pre.2"
+version = "1.0.0"
 dependencies = [
  "spinyarn-core",
 ]
 
 [[package]]
 name = "spinyarn-core"
-version = "1.0.0-pre.2"
+version = "1.0.0"
 dependencies = [
  "flate2",
  "once_cell",

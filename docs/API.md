@@ -385,7 +385,7 @@ int spinyarn_has_mapping(
 ## 6. 版本号
 
 ```c
-const char *spinyarn_version(void);   /* 如 "1.0.0-pre.2"，静态生命周期 */
+const char *spinyarn_version(void);   /* 如 "1.0.0"，静态生命周期 */
 ```
 
 ## 7. 完整 C 示例
@@ -530,7 +530,7 @@ spinyarn_has_mapping($handle, string $version, int $mapping_type = SPINYARN_YARN
 ### `spinyarn_version` —— 库版本
 
 ```php
-spinyarn_version(): string   // 如 "1.0.0-pre.2"
+spinyarn_version(): string   // 如 "1.0.0"
 ```
 
 ## 4. 完整 PHP 示例
