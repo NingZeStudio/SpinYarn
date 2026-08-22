@@ -34,23 +34,21 @@ _Static_assert(SPINYARN_YARN == 0 && SPINYARN_VANILLA == 1,
  * Create an engine from explicit settings (no config file).
  * - `mappings_dir`: directory holding the mapping files. Pass NULL to fall back
  *   to SPINYARN_MAPPINGS_DIR or <exe>/mappings.
- * - `auto_download`: 1 to download missing mappings on demand, 0 to disable.
  * Uses the default LRU cache bound.
  * Returns NULL on failure.
  */
-spinyarn_handle_t *spinyarn_init(const char *mappings_dir, int auto_download);
+spinyarn_handle_t *spinyarn_init(const char *mappings_dir);
 
 /*
  * Full MySQLi-style positional configuration (no config file).
  * - `mappings_dir`: directory holding the mapping files (NULL = default).
- * - `auto_download`: 1 = download missing mappings on demand, 0 = disable.
  * - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps it at
  *   that many entries.
  * - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from the
  *   cap); otherwise used verbatim.
  * Returns NULL on failure.
  */
-spinyarn_handle_t *spinyarn_init_full(const char *mappings_dir, int auto_download,
+spinyarn_handle_t *spinyarn_init_full(const char *mappings_dir,
                                       size_t cache_max_entries,
                                       size_t cache_high_watermark,
                                       size_t cache_low_watermark);
@@ -92,13 +90,6 @@ double spinyarn_result_time_ms(const spinyarn_result_t *result);
 /* Release a result. */
 void spinyarn_result_free(spinyarn_result_t *result);
 
-/* Load/refresh a version's mapping from its source (1 = ready). */
-int spinyarn_load_mapping(
-    spinyarn_handle_t *handle,
-    const char *version,
-    spinyarn_mapping_type_t mapping_type,
-    int force);
-
 /* Whether a version/type mapping file exists locally (1 = yes). */
 int spinyarn_has_mapping(
     spinyarn_handle_t *handle,
@@ -107,13 +98,6 @@ int spinyarn_has_mapping(
 
 /* Library version string (e.g. "1.0.0-pre.1"). */
 const char *spinyarn_version(void);
-
-/*
- * Bootstrap the default full version list (43 Yarn + Vanilla families): download
- * every missing mapping file. Synchronous (blocking); call from an init/deploy
- * path, not the hot request path. Returns the number of files downloaded (>= 0).
- */
-size_t spinyarn_bootstrap(spinyarn_handle_t *handle);
 
 #ifdef __cplusplus
 }

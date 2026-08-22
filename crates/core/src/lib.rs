@@ -10,9 +10,6 @@ use std::sync::Arc;
 
 use deobfuscator::DeobfuscateResult;
 use mapping::dispatcher::{self, LoadedMappings, MappingType};
-use mapping::download::{
-    ensure_mapping, ensure_vanilla_mapping, is_downloadable_version, MappingLoadError,
-};
 
 /// A self-contained deobfuscation engine instance.
 ///
@@ -23,7 +20,6 @@ use mapping::download::{
 /// keeping cache hits gate-free.
 pub struct Spinyarn {
     mappings_dir: String,
-    auto_download: bool,
     cache: Option<Arc<cache::Cache>>,
 }
 
@@ -37,25 +33,12 @@ pub struct DeobfuscateOutput {
     pub total_time_ms: f64,
 }
 
-/// Statistics for a bootstrap (full-list download) run.
-#[derive(Debug, Default, Clone, serde::Serialize)]
-pub struct BootstrapStats {
-    /// Mapping files downloaded this run.
-    pub downloaded: usize,
-    /// Mapping files already present and skipped.
-    pub skipped: usize,
-    /// Downloads that failed (network/IO error; "no official mapping" does not
-    /// count as a failure).
-    pub failed: usize,
-}
-
 impl Spinyarn {
     /// Build an engine from a loaded [`config::Config`], honouring every cache
     /// field (bound + watermarks) exactly as configured.
     pub fn new(config: &config::Config) -> Self {
         Self::from_full_settings(
             &config.maven.mappings_dir,
-            config.maven.auto_download,
             if config.cache.enabled {
                 config.cache.max_entries
             } else {
@@ -68,11 +51,10 @@ impl Spinyarn {
 
     /// Build an engine from explicit settings (no config file), with the
     /// default LRU cache configuration. Used by the C ABI's short init.
-    pub fn from_settings(mappings_dir: &str, auto_download: bool) -> Self {
+    pub fn from_settings(mappings_dir: &str) -> Self {
         let d = config::CacheConfig::default();
         Self::from_full_settings(
             mappings_dir,
-            auto_download,
             d.max_entries,
             d.high_watermark,
             d.low_watermark,
@@ -88,7 +70,6 @@ impl Spinyarn {
     ///   the cap); otherwise the explicit watermark values are used.
     pub fn from_full_settings(
         mappings_dir: &str,
-        auto_download: bool,
         cache_max_entries: usize,
         cache_high_watermark: usize,
         cache_low_watermark: usize,
@@ -116,7 +97,6 @@ impl Spinyarn {
         };
         Spinyarn {
             mappings_dir: mappings_dir.to_string(),
-            auto_download,
             cache,
         }
     }
@@ -126,38 +106,11 @@ impl Spinyarn {
         &self.mappings_dir
     }
 
-    /// Whether on-demand mapping download is enabled.
-    pub fn auto_download(&self) -> bool {
-        self.auto_download
-    }
-
-    /// Make sure a mapping for `version`/`mapping_type` is available locally,
-    /// downloading it on demand when enabled. Returns `false` when the caller
-    /// should pass the input through unchanged (unsupported or download failed).
+    /// Whether a mapping for `version`/`mapping_type` is available locally.
+    /// Mapping files are provided externally (shipped/downloaded by the host);
+    /// this engine never downloads them.
     pub fn ensure_available(&self, version: &str, mtype: MappingType) -> bool {
-        if dispatcher::is_supported(version, &self.mappings_dir, mtype) {
-            return true;
-        }
-        if !(self.auto_download && is_downloadable_version(version)) {
-            return false;
-        }
-        let result = match mtype {
-            MappingType::Yarn => ensure_mapping(version, &self.mappings_dir, false),
-            MappingType::Vanilla => ensure_vanilla_mapping(version, &self.mappings_dir, false),
-        };
-        match result {
-            Ok(true) => true,
-            Ok(false) => false,
-            Err(e) => {
-                tracing::warn!(
-                    "auto-download failed for {} {}: {}",
-                    mtype.as_str(),
-                    version,
-                    e
-                );
-                false
-            }
-        }
+        dispatcher::is_supported(version, &self.mappings_dir, mtype)
     }
 
     /// Look up an already-parsed mapping in the cache (no load performed).
@@ -216,19 +169,6 @@ impl Spinyarn {
         Self::deobfuscate_loaded(&shared, content)
     }
 
-    /// Load/refresh a version's mapping file from its source.
-    pub fn load_mapping(
-        &self,
-        version: &str,
-        mapping_type: MappingType,
-        force: bool,
-    ) -> Result<bool, MappingLoadError> {
-        match mapping_type {
-            MappingType::Yarn => ensure_mapping(version, &self.mappings_dir, force),
-            MappingType::Vanilla => ensure_vanilla_mapping(version, &self.mappings_dir, force),
-        }
-    }
-
     /// Whether a version/type mapping file exists locally.
     pub fn has_mapping(&self, version: &str, mapping_type: MappingType) -> bool {
         dispatcher::is_supported(version, &self.mappings_dir, mapping_type)
@@ -252,56 +192,6 @@ impl Spinyarn {
             }
         }
         (removed_files, removed_cache)
-    }
-
-    /// Bootstrap a full version list: for each version, ensure both the Yarn
-    /// and Vanilla mapping files exist locally, downloading any that are
-    /// missing. Existing files are skipped. "No official Vanilla mapping" is
-    /// not an error. Synchronous (blocking); call from an init/deploy path, not
-    /// the hot request path.
-    pub fn bootstrap(&self, versions: &[String]) -> BootstrapStats {
-        let mut stats = BootstrapStats::default();
-        for version in versions {
-            let yarn = dispatcher::local_path(version, &self.mappings_dir, MappingType::Yarn);
-            if yarn.exists() {
-                stats.skipped += 1;
-            } else if self.auto_download {
-                match ensure_mapping(version, &self.mappings_dir, false) {
-                    Ok(true) => stats.downloaded += 1,
-                    Ok(false) => {
-                        tracing::debug!("bootstrap: {} yarn unsupported (no maven build)", version)
-                    }
-                    Err(e) => {
-                        tracing::warn!("bootstrap: {} yarn failed: {}", version, e);
-                        stats.failed += 1;
-                    }
-                }
-            }
-
-            let vanilla =
-                dispatcher::local_path(version, &self.mappings_dir, MappingType::Vanilla);
-            if vanilla.exists() {
-                stats.skipped += 1;
-            } else if self.auto_download {
-                match ensure_vanilla_mapping(version, &self.mappings_dir, false) {
-                    Ok(true) => stats.downloaded += 1,
-                    Ok(false) => tracing::debug!(
-                        "bootstrap: {} vanilla unavailable (no official mapping)",
-                        version
-                    ),
-                    Err(e) => {
-                        tracing::warn!("bootstrap: {} vanilla failed: {}", version, e);
-                        stats.failed += 1;
-                    }
-                }
-            }
-        }
-        stats
-    }
-
-    /// Bootstrap the default full version list (43 Yarn + Vanilla families).
-    pub fn bootstrap_default(&self) -> BootstrapStats {
-        self.bootstrap(&config::default_bootstrap_versions())
     }
 
     fn passthrough(content: &str) -> DeobfuscateOutput {
@@ -332,13 +222,13 @@ mod tests {
 
     #[test]
     fn test_from_full_settings_cache_disabled() {
-        let s = Spinyarn::from_full_settings("/tmp", false, 0, 0, 0);
+        let s = Spinyarn::from_full_settings("/tmp", 0, 0, 0);
         assert!(s.cache.is_none());
     }
 
     #[test]
     fn test_from_full_settings_custom_bound() {
-        let s = Spinyarn::from_full_settings("/tmp", false, 8, 8, 4);
+        let s = Spinyarn::from_full_settings("/tmp", 8, 8, 4);
         let cache = s.cache.as_ref().expect("cache enabled");
         let stats = cache.stats();
         assert!(stats.enabled);
@@ -347,7 +237,7 @@ mod tests {
     #[test]
     fn test_from_full_settings_auto_watermarks() {
         // high=0, low=0 -> derived from the cap (high = cap, low = 3/4 cap).
-        let s = Spinyarn::from_full_settings("/tmp", false, 10, 0, 0);
+        let s = Spinyarn::from_full_settings("/tmp", 10, 0, 0);
         let cache = s.cache.as_ref().expect("cache enabled");
         let stats = cache.stats();
         assert!(stats.enabled);
@@ -362,7 +252,7 @@ mod tests {
         let mut f = std::fs::File::create(dir.join("vanilla").join("1.21.4.txt")).unwrap();
         f.write_all(b"com.example.Main -> a:\n    0:10:void init() -> b\n").unwrap();
 
-        let s = Spinyarn::from_settings(dir.to_str().unwrap(), false);
+        let s = Spinyarn::from_settings(dir.to_str().unwrap());
         // Populate the cache by loading once.
         let loaded = s.load("1.21.4", MappingType::Vanilla).expect("load");
         let shared = Arc::new(loaded);
@@ -378,46 +268,10 @@ mod tests {
 
     #[test]
     fn test_passthrough_unsupported_version() {
-        let s = Spinyarn::from_settings("/tmp/nonexistent", false);
-        // Snapshot version is not downloadable -> passthrough.
+        let s = Spinyarn::from_settings("/tmp/nonexistent");
+        // Snapshot version has no mapping file -> passthrough.
         let out = s.deobfuscate("at a.b(X.java:1)", "25w44a", MappingType::Yarn);
         assert_eq!(out.deobfuscated, "at a.b(X.java:1)");
         assert_eq!(out.classes_mapped, 0);
-    }
-
-    #[test]
-    fn test_bootstrap_skips_existing_files() {
-        let dir = std::env::temp_dir().join(format!("spinyarn-bootstrap-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-
-        // Pre-place both a Yarn and a Vanilla mapping for 1.21.9.
-        std::fs::write(dir.join("1.21.9.tiny.gz"), b"garbage").unwrap();
-        std::fs::create_dir_all(dir.join("vanilla")).unwrap();
-        std::fs::write(dir.join("vanilla").join("1.21.9.txt"), b"garbage").unwrap();
-
-        // auto_download = false so nothing is fetched; both files exist -> skipped.
-        let s = Spinyarn::from_settings(dir.to_str().unwrap(), false);
-        let stats = s.bootstrap(&["1.21.9".to_string()]);
-        assert_eq!(stats.skipped, 2);
-        assert_eq!(stats.downloaded, 0);
-        assert_eq!(stats.failed, 0);
-
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[test]
-    fn test_bootstrap_no_download_when_disabled() {
-        let dir = std::env::temp_dir().join(format!("spinyarn-bootstrap-off-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-
-        // auto_download = false and no files present -> nothing happens, no failures.
-        let s = Spinyarn::from_settings(dir.to_str().unwrap(), false);
-        let stats = s.bootstrap(&["1.21.9".to_string()]);
-        assert_eq!(stats.downloaded, 0);
-        assert_eq!(stats.failed, 0);
-
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

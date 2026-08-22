@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::deobfuscator::{DeobfuscateResult, LineEngine, VanillaEngine};
-use crate::mapping::download::{is_valid_version, is_version_supported, load_mappings};
+use crate::mapping::local::{is_valid_version, is_version_supported, load_mappings};
 use crate::mapping::vanilla::{is_vanilla_supported, load_vanilla_mappings, VanillaMappings};
 use crate::mapping::Mappings;
 
@@ -90,7 +90,7 @@ pub fn is_supported(version: &str, mappings_dir: &str, mtype: MappingType) -> bo
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     #[error("yarn mapping load: {0}")]
-    Yarn(#[from] crate::mapping::download::MappingLoadError),
+    Yarn(#[from] crate::mapping::local::MappingLoadError),
     #[error("vanilla mapping load: {0}")]
     Vanilla(#[from] crate::mapping::vanilla::VanillaParseError),
 }

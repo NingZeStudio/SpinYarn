@@ -2,6 +2,22 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [v1.0.0-pre.2] - 2026-08-22
+
+> 移除运行时下载能力：映射表改由上层宿主软件提供。SpinYarn 只负责「本地加载 + 解析 + LRU 缓存」，不再自动补全/下载映射。
+
+### 变更
+- **移除 `auto_download`**：`MavenConfig.auto_download`、`default_auto_download()`、`bootstrap_versions` 及 `default_bootstrap_versions()` 全部删除；`Spinyarn` 结构不再持有 `auto_download` 字段
+- **构造器签名简化**：`Spinyarn::from_settings(mappings_dir)`、`Spinyarn::from_full_settings(mappings_dir, cache_max, cache_high, cache_low)`（去掉 `auto_download` 参数）
+- **移除下载/引导方法**：`Spinyarn::load_mapping()`、`bootstrap()`、`bootstrap_default()` 与 `BootstrapStats` 删除；`ensure_available()` 简化为「仅检查本地文件存在」
+- **`mapping/download.rs` → `mapping/local.rs`**：仅保留 `is_valid_version`/`is_version_supported`/`load_mappings`/`parse_gz` 等本地加载与校验；删除全部 HTTP 下载代码（`ureq` 依赖同步移除）
+- **C ABI**：`spinyarn_init(mappings_dir)`、`spinyarn_init_full(mappings_dir, cache_max, cache_high, cache_low)` 去掉 `auto_download`；删除 `spinyarn_load_mapping`、`spinyarn_bootstrap`
+- **PHP 扩展**：`spinyarn_init(?string $mappings_dir = null, int $cache_max_entries = 44, int $cache_high_watermark = 40, int $cache_low_watermark = 30)`；删除 `spinyarn_load_mapping`、`spinyarn_bootstrap`
+- **Web API**：移除 `POST /api/v1/mappings/load`（下载端点），保留 `load/local`、`list`、`stats`、`unload`；启动不再触发 bootstrap
+
+### 破坏性变更
+- 映射表必须由宿主预先放置到 `mappings_dir`（Yarn `*.tiny.gz` + `vanilla/*.txt`），缺失时反混淆直接透传原样，不再下载
+
 ## [v1.0.0-pre.1] - 2026-08-18
 
 > 首个 pre-release：Web API 与 C ABI/PHP 扩展双产物交付，核心引擎稳定。本条目整合了自 v0.3.4 以来的全部开发变更（中间版本 0.9.0 未对外发布）。

@@ -10,11 +10,11 @@ use crate::api::response::ApiResponse;
 use crate::api::AppState;
 use crate::error::ApiError;
 use crate::mapping::dispatcher::{self, MappingType};
-use crate::mapping::download::is_valid_version;
+use crate::mapping::local::is_valid_version;
 
 /// Reject a version that would escape the mappings dir when used in a path.
 /// The `dispatcher::local_path` helpers join the version verbatim, so every
-/// user-supplied version must pass the same token validation used by download.
+/// user-supplied version must pass the same token validation used by load.
 fn validate_version(version: &str) -> Result<(), ApiError> {
     if !is_valid_version(version) {
         return Err(ApiError::BadRequest(format!(
@@ -23,15 +23,6 @@ fn validate_version(version: &str) -> Result<(), ApiError> {
         )));
     }
     Ok(())
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct LoadRequest {
-    pub version: String,
-    #[serde(default)]
-    pub mapping_type: Option<String>,
-    #[serde(default)]
-    pub refresh: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -50,39 +41,6 @@ pub struct LoadedInfo {
     pub ok: bool,
     pub path: String,
     pub bytes: u64,
-}
-
-/// POST /api/v1/mappings/load — fetch/refresh a version's mapping from its source.
-#[utoipa::path(
-    post,
-    path = "/api/v1/mappings/load",
-    request_body = LoadRequest,
-    responses((status = 200, body = ApiResponse<LoadedInfo>))
-)]
-pub async fn load_mapping(
-    State(state): State<AppState>,
-    Json(req): Json<LoadRequest>,
-) -> Result<Json<ApiResponse<LoadedInfo>>, ApiError> {
-    let mtype = MappingType::parse(req.mapping_type.as_deref().unwrap_or(""));
-    let force = req.refresh.unwrap_or(false);
-    validate_version(&req.version)?;
-
-    let version = req.version.clone();
-    let spinyarn = state.spinyarn.clone();
-    let ready = tokio::task::spawn_blocking(move || spinyarn.load_mapping(&version, mtype, force))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let path = dispatcher::local_path(&req.version, state.spinyarn.mappings_dir(), mtype);
-    let bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-    Ok(Json(ApiResponse::success(LoadedInfo {
-        version: req.version,
-        mapping_type: mtype.as_str().to_string(),
-        ok: ready,
-        path: path.to_string_lossy().into_owned(),
-        bytes,
-    })))
 }
 
 /// POST /api/v1/mappings/load/local — load a mapping file from the local

@@ -48,21 +48,19 @@ static spinyarn_handle_t *fetch_handle(zval *z)
  * PHP functions
  * --------------------------------------------------------------------- */
 
-/* spinyarn_init(?string $mappings_dir = null, bool $auto_download = true,
+/* spinyarn_init(?string $mappings_dir = null,
  *               int $cache_max_entries = 44, int $cache_high_watermark = 40,
  *               int $cache_low_watermark = 30): resource */
 PHP_FUNCTION(spinyarn_init)
 {
     zend_string *mappings_dir = NULL;
-    bool auto_download = true;
     zend_long cache_max_entries = 44;
     zend_long cache_high_watermark = 40;
     zend_long cache_low_watermark = 30;
 
-    ZEND_PARSE_PARAMETERS_START(0, 5)
+    ZEND_PARSE_PARAMETERS_START(0, 4)
         Z_PARAM_OPTIONAL
         Z_PARAM_STR_OR_NULL(mappings_dir)
-        Z_PARAM_BOOL(auto_download)
         Z_PARAM_LONG(cache_max_entries)
         Z_PARAM_LONG(cache_high_watermark)
         Z_PARAM_LONG(cache_low_watermark)
@@ -80,7 +78,6 @@ PHP_FUNCTION(spinyarn_init)
 
     spinyarn_handle_t *handle = spinyarn_init_full(
         mappings_dir ? ZSTR_VAL(mappings_dir) : NULL,
-        auto_download ? 1 : 0,
         (size_t)cache_max_entries,
         (size_t)cache_high_watermark,
         (size_t)cache_low_watermark);
@@ -141,34 +138,6 @@ PHP_FUNCTION(spinyarn_deobfuscate)
     spinyarn_result_free(result);
 }
 
-/* spinyarn_load_mapping(resource $handle, string $version,
- *                       int $mapping_type = 0, bool $force = false): bool */
-PHP_FUNCTION(spinyarn_load_mapping)
-{
-    zval *handle_z;
-    char *version = NULL;
-    size_t version_len = 0;
-    zend_long mapping_type = SPINYARN_YARN;
-    bool force = false;
-
-    ZEND_PARSE_PARAMETERS_START(2, 4)
-        Z_PARAM_RESOURCE(handle_z)
-        Z_PARAM_STRING(version, version_len)
-        Z_PARAM_OPTIONAL
-        Z_PARAM_LONG(mapping_type)
-        Z_PARAM_BOOL(force)
-    ZEND_PARSE_PARAMETERS_END();
-
-    spinyarn_handle_t *handle = fetch_handle(handle_z);
-    if (handle == NULL) {
-        RETURN_FALSE;
-    }
-
-    int ok = spinyarn_load_mapping(
-        handle, version, (spinyarn_mapping_type_t)mapping_type, force ? 1 : 0);
-    RETURN_BOOL(ok != 0);
-}
-
 /* spinyarn_has_mapping(resource $handle, string $version,
  *                      int $mapping_type = 0): bool */
 PHP_FUNCTION(spinyarn_has_mapping)
@@ -202,30 +171,12 @@ PHP_FUNCTION(spinyarn_version)
     RETURN_STRING(spinyarn_version());
 }
 
-/* spinyarn_bootstrap(resource $handle): int */
-PHP_FUNCTION(spinyarn_bootstrap)
-{
-    zval *handle_z;
-
-    ZEND_PARSE_PARAMETERS_START(1, 1)
-        Z_PARAM_RESOURCE(handle_z)
-    ZEND_PARSE_PARAMETERS_END();
-
-    spinyarn_handle_t *handle = fetch_handle(handle_z);
-    if (handle == NULL) {
-        RETURN_FALSE;
-    }
-
-    RETURN_LONG((zend_long)spinyarn_bootstrap(handle));
-}
-
 /* ------------------------------------------------------------------------
  * Arg info
  * --------------------------------------------------------------------- */
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_init, 0, 0, 0)
     ZEND_ARG_TYPE_INFO(0, mappings_dir, IS_STRING, 1)
-    ZEND_ARG_TYPE_INFO(0, auto_download, _IS_BOOL, 1)
     ZEND_ARG_TYPE_INFO(0, cache_max_entries, IS_LONG, 1)
     ZEND_ARG_TYPE_INFO(0, cache_high_watermark, IS_LONG, 1)
     ZEND_ARG_TYPE_INFO(0, cache_low_watermark, IS_LONG, 1)
@@ -238,13 +189,6 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_deobfuscate, 0, 0, 3)
     ZEND_ARG_TYPE_INFO(0, mapping_type, IS_LONG, 1)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_load_mapping, 0, 0, 2)
-    ZEND_ARG_INFO(0, handle)
-    ZEND_ARG_TYPE_INFO(0, version, IS_STRING, 0)
-    ZEND_ARG_TYPE_INFO(0, mapping_type, IS_LONG, 1)
-    ZEND_ARG_TYPE_INFO(0, force, _IS_BOOL, 1)
-ZEND_END_ARG_INFO()
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_has_mapping, 0, 0, 2)
     ZEND_ARG_INFO(0, handle)
     ZEND_ARG_TYPE_INFO(0, version, IS_STRING, 0)
@@ -254,10 +198,6 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_version, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_bootstrap, 0, 0, 1)
-    ZEND_ARG_INFO(0, handle)
-ZEND_END_ARG_INFO()
-
 /* ------------------------------------------------------------------------
  * Function table
  * --------------------------------------------------------------------- */
@@ -265,10 +205,8 @@ ZEND_END_ARG_INFO()
 static const zend_function_entry spinyarn_functions[] = {
     PHP_FE(spinyarn_init, arginfo_spinyarn_init)
     PHP_FE(spinyarn_deobfuscate, arginfo_spinyarn_deobfuscate)
-    PHP_FE(spinyarn_load_mapping, arginfo_spinyarn_load_mapping)
     PHP_FE(spinyarn_has_mapping, arginfo_spinyarn_has_mapping)
     PHP_FE(spinyarn_version, arginfo_spinyarn_version)
-    PHP_FE(spinyarn_bootstrap, arginfo_spinyarn_bootstrap)
     PHP_FE_END
 };
 

@@ -5,25 +5,6 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Spawn a background bootstrap that backfills every missing mapping from the
-/// configured version list (both Yarn and Vanilla families) when
-/// `maven.auto_download` is on. Runs off the request path; the server keeps
-/// serving while it fills in. Delegates to the core `Spinyarn::bootstrap`.
-fn bootstrap_mappings(spinyarn: Arc<Spinyarn>, versions: Vec<String>) {
-    tokio::spawn(async move {
-        tracing::info!("bootstrap: checking {} version(s)", versions.len());
-        let stats = tokio::task::spawn_blocking(move || spinyarn.bootstrap(&versions))
-            .await
-            .unwrap_or_default();
-        tracing::info!(
-            "bootstrap: done (downloaded={} skipped={} failed={})",
-            stats.downloaded,
-            stats.skipped,
-            stats.failed
-        );
-    });
-}
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
@@ -48,9 +29,6 @@ async fn main() {
     );
 
     let spinyarn = Arc::new(Spinyarn::new(&config));
-    if config.maven.auto_download {
-        bootstrap_mappings(spinyarn.clone(), config.maven.bootstrap_versions.clone());
-    }
     let app = build_router(config.clone(), spinyarn);
 
     // Bind with port-auto-increment: if the configured/default port is taken,

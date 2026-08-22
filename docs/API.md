@@ -14,7 +14,7 @@ SpinYarn 是一个 Minecraft 日志反混淆引擎，将混淆的堆栈追踪（
 | 配置 | `config.toml`（自动生成） | **无配置文件**，构造时位置参数传入 |
 | 网络开销 | 有（HTTP + JSON 序列化） | 无（函数调用） |
 | 并发控制 | 内置信号量（默认 32） | 宿主自行控制 |
-| 全量下载 | 启动时后台自动补全 | `spinyarn_bootstrap` 显式调用 |
+| 映射提供 | 宿主预先放置到映射目录 | 宿主预先放置到映射目录 |
 | 适合场景 | 多客户端共享服务 | 单一宿主高频嵌入（如 PHP 项目） |
 
 ---
@@ -29,7 +29,7 @@ SpinYarn 是一个 Minecraft 日志反混淆引擎，将混淆的堆栈追踪（
 cargo build --release
 ```
 
-产物为单文件二进制 `target/release/spinyarn`，映射表**不嵌入二进制**，运行时按需加载。
+产物为单文件二进制 `target/release/spinyarn`，映射表**不嵌入二进制**，运行时按需从映射目录加载。
 
 ### 1.2 映射准备
 
@@ -38,17 +38,15 @@ cargo build --release
 - Yarn：`mappings/<version>.tiny.gz`
 - Vanilla：`mappings/vanilla/<version>.txt`
 
-两种获取方式：
+映射表由**宿主预先下载并放置**（本引擎不做任何网络下载），脚本预下载：
 
-1. **启动自动补全（推荐，默认开启）**：`maven.auto_download = true`（默认）时，服务启动后会在后台按 `maven.bootstrap_versions` 清单（默认 1.14 ~ 1.21.11 共 43 个版本的 Yarn + Vanilla 双家族映射）**逐个检查缺失并补全**（目录不存在会自动创建），不阻塞启动。
-2. **脚本预下载**：
-   ```bash
-   bash scripts/download_mappings.sh            # 下载全部 43 个 Yarn 版本
-   bash scripts/download_mappings.sh 1.21.9     # 只下载指定版本
-   python3 scripts/download_vanilla_mappings.py  # 下载 Vanilla 官方映射
-   ```
+```bash
+bash scripts/download_mappings.sh            # 下载全部 43 个 Yarn 版本
+bash scripts/download_mappings.sh 1.21.9     # 只下载指定版本
+python3 scripts/download_vanilla_mappings.py  # 下载 Vanilla 官方映射
+```
 
-运行时请求一个本地缺失的 `1.x` 版本（含 `-pre`/`-rc`）时，若 `auto_download` 开启，也会按需自动下载（磁盘 TTL 7 天）。
+请求一个本地缺失的版本时，反混淆直接透传原样（不报错、不下载）。
 
 ### 1.3 配置
 
@@ -63,8 +61,6 @@ max_concurrency = 32          # 默认；SPINYARN_MAX_CONCURRENCY 可兜底
 
 [maven]
 mappings_dir = "./mappings"   # 默认二进制同级；SPINYARN_MAPPINGS_DIR 可兜底
-auto_download = true          # 缺失版本自动下载
-# bootstrap_versions = ["1.21.9", "1.21.11"]  # 启动引导下载清单（默认 43 个版本）
 
 [cache]
 enabled = true                # 有界 LRU 缓存
@@ -314,19 +310,18 @@ typedef enum {
 
 ```c
 /* 简版：默认 LRU 缓存（44 条目 / 水位 40/30） */
-spinyarn_handle_t *spinyarn_init(const char *mappings_dir, int auto_download);
+spinyarn_handle_t *spinyarn_init(const char *mappings_dir);
 
 /* 全参数版（MySQLi 风格位置参数） */
 spinyarn_handle_t *spinyarn_init_full(
     const char *mappings_dir,      /* 映射目录；NULL = 用 SPINYARN_MAPPINGS_DIR 或 <exe>/mappings */
-    int auto_download,             /* 1 = 缺失版本自动下载，0 = 关闭 */
     size_t cache_max_entries,      /* 0 = 禁用缓存；正数 = 缓存上限 */
     size_t cache_high_watermark,   /* 0 = 自动（随上限推导）；否则用该值 */
     size_t cache_low_watermark     /* 0 = 自动；否则用该值 */
 );
 ```
 
-两者失败均返回 `NULL`。无配置文件，全部设置通过参数传入。
+两者失败均返回 `NULL`。无配置文件，全部设置通过参数传入。映射表由宿主预先放置到映射目录（缺失时反混淆透传）。
 
 ### `spinyarn_free`
 
@@ -373,20 +368,7 @@ void spinyarn_result_free(spinyarn_result_t *result);
 
 释放结果。每个 `spinyarn_deobfuscate` 返回的结果都必须调用此函数释放（`NULL` 安全）。
 
-## 5. 映射管理与全量下载
-
-### `spinyarn_load_mapping`
-
-```c
-int spinyarn_load_mapping(
-    spinyarn_handle_t *handle,
-    const char *version,
-    spinyarn_mapping_type_t mapping_type,
-    int force                      /* 1 = 强制刷新（忽略 TTL），0 = 仅缺失/过期时下载 */
-);
-```
-
-返回 `1` = 映射已就绪，`0` = 失败（不可下载或网络错误）。
+## 5. 映射查询
 
 ### `spinyarn_has_mapping`
 
@@ -400,18 +382,10 @@ int spinyarn_has_mapping(
 
 返回 `1` = 本地存在该映射文件，`0` = 不存在。
 
-### `spinyarn_bootstrap`
-
-```c
-size_t spinyarn_bootstrap(spinyarn_handle_t *handle);
-```
-
-**全量下载**默认版本清单（43 Yarn + Vanilla 双家族）：逐个检查缺失并下载，已存在的跳过。**同步阻塞**，应在部署/初始化阶段调用，不要在热请求路径调用。返回下载的文件数（`>= 0`）。
-
 ## 6. 版本号
 
 ```c
-const char *spinyarn_version(void);   /* 如 "1.0.0-pre.1"，静态生命周期 */
+const char *spinyarn_version(void);   /* 如 "1.0.0-pre.2"，静态生命周期 */
 ```
 
 ## 7. 完整 C 示例
@@ -422,16 +396,12 @@ const char *spinyarn_version(void);   /* 如 "1.0.0-pre.1"，静态生命周期 
 #include "spinyarn.h"
 
 int main(void) {
-    /* 全参数初始化：映射目录 + 自动下载 + 缓存上限 44 / 水位 40/30 */
-    spinyarn_handle_t *h = spinyarn_init_full("./mappings", 1, 44, 40, 30);
+    /* 全参数初始化：映射目录 + 缓存上限 44 / 水位 40/30 */
+    spinyarn_handle_t *h = spinyarn_init_full("./mappings", 44, 40, 30);
     if (!h) {
         fprintf(stderr, "init failed\n");
         return 1;
     }
-
-    /* 部署阶段全量下载默认版本清单 */
-    size_t n = spinyarn_bootstrap(h);
-    printf("bootstrap downloaded %zu mapping files\n", n);
 
     const char *log = "at net.minecraft.class_310.method_55608(Client.java:465)\n";
     spinyarn_result_t *r = spinyarn_deobfuscate(
@@ -511,19 +481,18 @@ LD_LIBRARY_PATH=/path/to/target/release php ...    # 或 export LD_LIBRARY_PATH
 ```php
 spinyarn_init(
     ?string $mappings_dir = null,      // 映射目录；null = SPINYARN_MAPPINGS_DIR 或宿主 exe 旁 ./mappings
-    bool $auto_download = true,        // 缺失版本自动下载
     int $cache_max_entries = 44,       // 0 = 禁用缓存；正数 = 缓存上限
     int $cache_high_watermark = 40,    // 0 = 自动
     int $cache_low_watermark = 30      // 0 = 自动
 ): resource|false
 ```
 
-返回 resource 句柄，失败返回 `false`。**无配置文件**，MySQLi 风格位置参数。
+返回 resource 句柄，失败返回 `false`。**无配置文件**，MySQLi 风格位置参数。映射表由宿主预先放置到映射目录（缺失时反混淆透传）。
 
 ```php
-$h = spinyarn_init(__DIR__ . '/mappings', true);          // 默认缓存 44/40/30
-$h = spinyarn_init(__DIR__ . '/mappings', true, 10, 8, 5); // 自定义水位
-$h = spinyarn_init(__DIR__ . '/mappings', true, 0);        // 禁用缓存
+$h = spinyarn_init(__DIR__ . '/mappings');          // 默认缓存 44/40/30
+$h = spinyarn_init(__DIR__ . '/mappings', 10, 8, 5); // 自定义水位
+$h = spinyarn_init(__DIR__ . '/mappings', 0);        // 禁用缓存
 ```
 
 ### `spinyarn_deobfuscate` —— 反混淆
@@ -552,52 +521,29 @@ $r === [
 */
 ```
 
-### `spinyarn_load_mapping` —— 加载/刷新映射
-
-```php
-spinyarn_load_mapping(
-    $handle,
-    string $version,
-    int $mapping_type = SPINYARN_YARN,
-    bool $force = false           // true = 强制刷新（忽略 7 天 TTL）
-): bool
-```
-
 ### `spinyarn_has_mapping` —— 查询映射是否本地存在
 
 ```php
 spinyarn_has_mapping($handle, string $version, int $mapping_type = SPINYARN_YARN): bool
 ```
 
-### `spinyarn_bootstrap` —— 全量下载默认版本清单
-
-```php
-spinyarn_bootstrap($handle): int|false
-```
-
-**同步阻塞**，逐个下载缺失的 43 Yarn + Vanilla 映射，返回下载文件数（`>= 0`）。应在部署/初始化阶段调用一次，**不要**在每次请求里调用。
-
 ### `spinyarn_version` —— 库版本
 
 ```php
-spinyarn_version(): string   // 如 "1.0.0-pre.1"
+spinyarn_version(): string   // 如 "1.0.0-pre.2"
 ```
 
 ## 4. 完整 PHP 示例
 
 ```php
 <?php
-// 1. 初始化（部署阶段执行一次）
-$handle = spinyarn_init(__DIR__ . '/mappings', true, 44, 40, 30);
+// 1. 初始化（部署阶段执行一次；映射表需已由下载脚本预先放入 ./mappings）
+$handle = spinyarn_init(__DIR__ . '/mappings', 44, 40, 30);
 if ($handle === false) {
     throw new RuntimeException('spinyarn_init failed');
 }
 
-// 2. 全量下载默认版本清单（仅部署/初始化阶段调用一次，阻塞）
-$downloaded = spinyarn_bootstrap($handle);
-echo "bootstrap downloaded {$downloaded} mapping files\n";
-
-// 3. 运行时反混淆（每次请求调用）
+// 2. 运行时反混淆（每次请求调用）
 $log = "at net.minecraft.class_310.method_55608(Client.java:465)\n";
 $r = spinyarn_deobfuscate($handle, $log, '1.21.9', SPINYARN_YARN);
 if ($r === false) {

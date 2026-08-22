@@ -150,7 +150,7 @@ pub fn parse_tsrg(input: &str) -> Result<VanillaMappings, VanillaParseError> {
 
 /// Whether a Vanilla mapping file exists for a version.
 pub fn is_vanilla_supported(version: &str, mappings_dir: &str) -> bool {
-    if !crate::mapping::download::is_valid_version(version) {
+    if !crate::mapping::local::is_valid_version(version) {
         return false;
     }
     std::path::Path::new(mappings_dir)
@@ -165,7 +165,7 @@ pub fn load_vanilla_mappings(
     version: &str,
     mappings_dir: &str,
 ) -> Result<Option<VanillaMappings>, VanillaParseError> {
-    if !crate::mapping::download::is_valid_version(version) {
+    if !crate::mapping::local::is_valid_version(version) {
         return Ok(None);
     }
     let path = std::path::Path::new(mappings_dir)

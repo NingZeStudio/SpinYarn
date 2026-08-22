@@ -24,7 +24,6 @@ mod response;
         deobfuscate::handler,
         deobfuscate::handler_plain,
         health::handler,
-        mappings::load_mapping,
         mappings::load_mapping_local,
         mappings::list_mappings,
         mappings::mapping_stats,
@@ -35,7 +34,6 @@ mod response;
         deobfuscate::DeobfuscateResponse,
         deobfuscate::DeobfuscateStats,
         health::HealthResponse,
-        mappings::LoadRequest,
         mappings::LoadLocalRequest,
         mappings::LoadedInfo,
         mappings::MappingsList,
@@ -47,13 +45,13 @@ mod response;
         title = "SpinYarn API",
         description = "Minecraft 日志反混淆服务：Fabric(Yarn) 与 Vanilla(Mojang official) 映射支持。",
         // utoipa's macro only accepts a literal here; keep in sync with Cargo.toml.
-        version = "1.0.0-pre.1"
+        version = "1.0.0-pre.2"
     )
 )]
 struct ApiDoc;
 
 /// Router-wide state: the deobfuscation concurrency gate and the shared engine
-/// (which owns the mappings dir, auto-download toggle, and LRU cache).
+/// (which owns the mappings dir and LRU cache).
 #[derive(Clone)]
 pub struct AppState {
     pub gate: Arc<Semaphore>,
@@ -132,7 +130,6 @@ pub fn build_router(config: Config, spinyarn: Arc<Spinyarn>) -> Router {
     let deobfuscate_plain_route: axum::routing::MethodRouter<AppState> =
         deobfuscate_plain_route.layer(info_trace.clone());
 
-    let load_route: axum::routing::MethodRouter<AppState> = axum::routing::post(mappings::load_mapping);
     let load_local_route: axum::routing::MethodRouter<AppState> =
         axum::routing::post(mappings::load_mapping_local);
     let list_route: axum::routing::MethodRouter<AppState> = axum::routing::get(mappings::list_mappings);
@@ -142,7 +139,6 @@ pub fn build_router(config: Config, spinyarn: Arc<Spinyarn>) -> Router {
     let api_routes = Router::new()
         .route("/api/v1/deobfuscate", deobfuscate_route)
         .route("/api/v1/deobfuscate/plain", deobfuscate_plain_route)
-        .route("/api/v1/mappings/load", load_route)
         .route("/api/v1/mappings/load/local", load_local_route)
         .route("/api/v1/mappings", list_route)
         .route("/api/v1/mappings/:type/:version", stats_route)

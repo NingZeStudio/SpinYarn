@@ -60,16 +60,13 @@ fn to_mapping_type(t: spinyarn_mapping_type_t) -> MappingType {
 
 /// # Safety
 /// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
-/// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). `auto_download` is 0/1.
-/// Uses the default LRU cache bound.
+/// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). Uses the default LRU cache
+/// bound.
 #[no_mangle]
-pub extern "C" fn spinyarn_init(
-    mappings_dir: *const c_char,
-    auto_download: c_int,
-) -> *mut spinyarn_handle {
+pub extern "C" fn spinyarn_init(mappings_dir: *const c_char) -> *mut spinyarn_handle {
     let result = catch_unwind(AssertUnwindSafe(|| {
         let dir = resolve_dir(mappings_dir);
-        let inner = Spinyarn::from_settings(&dir, auto_download != 0);
+        let inner = Spinyarn::from_settings(&dir);
         Box::into_raw(Box::new(spinyarn_handle { inner }))
     }));
     match result {
@@ -80,7 +77,7 @@ pub extern "C" fn spinyarn_init(
 
 /// # Safety
 /// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
-/// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default). `auto_download` is 0/1.
+/// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default).
 ///
 /// Full MySQLi-style positional config:
 /// - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps the
@@ -90,7 +87,6 @@ pub extern "C" fn spinyarn_init(
 #[no_mangle]
 pub extern "C" fn spinyarn_init_full(
     mappings_dir: *const c_char,
-    auto_download: c_int,
     cache_max_entries: usize,
     cache_high_watermark: usize,
     cache_low_watermark: usize,
@@ -99,7 +95,6 @@ pub extern "C" fn spinyarn_init_full(
         let dir = resolve_dir(mappings_dir);
         let inner = Spinyarn::from_full_settings(
             &dir,
-            auto_download != 0,
             cache_max_entries,
             cache_high_watermark,
             cache_low_watermark,
@@ -257,32 +252,6 @@ pub extern "C" fn spinyarn_result_free(result: *mut spinyarn_result) {
 /// `handle` must be a valid pointer from `spinyarn_init`; `version` must be a
 /// valid NUL-terminated C string.
 #[no_mangle]
-pub extern "C" fn spinyarn_load_mapping(
-    handle: *mut spinyarn_handle,
-    version: *const c_char,
-    mapping_type: spinyarn_mapping_type_t,
-    force: c_int,
-) -> c_int {
-    if handle.is_null() || version.is_null() {
-        return 0;
-    }
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        let handle = unsafe { &*handle };
-        let version = unsafe { std::ffi::CStr::from_ptr(version) }
-            .to_string_lossy()
-            .into_owned();
-        handle
-            .inner
-            .load_mapping(&version, to_mapping_type(mapping_type), force != 0)
-            .unwrap_or(false)
-    }));
-    result.unwrap_or(false) as c_int
-}
-
-/// # Safety
-/// `handle` must be a valid pointer from `spinyarn_init`; `version` must be a
-/// valid NUL-terminated C string.
-#[no_mangle]
 pub extern "C" fn spinyarn_has_mapping(
     handle: *mut spinyarn_handle,
     version: *const c_char,
@@ -312,27 +281,6 @@ pub extern "C" fn spinyarn_version() -> *const c_char {
         .as_ptr()
 }
 
-/// Bootstrap the default full version list (43 Yarn + Vanilla families):
-/// download every missing mapping file. Synchronous (blocking); call from an
-/// init/deploy path, not the hot request path.
-///
-/// # Safety
-/// `handle` must be a valid pointer from `spinyarn_init`.
-///
-/// Returns the number of mapping files downloaded (>= 0), or 0 on a null handle
-/// or panic.
-#[no_mangle]
-pub extern "C" fn spinyarn_bootstrap(handle: *mut spinyarn_handle) -> usize {
-    if handle.is_null() {
-        return 0;
-    }
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        let handle = unsafe { &*handle };
-        handle.inner.bootstrap_default().downloaded
-    }));
-    result.unwrap_or(0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_init_and_passthrough() {
-        let handle = spinyarn_init(std::ptr::null(), 0);
+        let handle = spinyarn_init(std::ptr::null());
         assert!(!handle.is_null());
 
         // A non-downloadable version (snapshot) passes through unchanged.
@@ -383,7 +331,7 @@ mod tests {
 
     #[test]
     fn test_deobfuscate_null_args() {
-        let handle = spinyarn_init(std::ptr::null(), 0);
+        let handle = spinyarn_init(std::ptr::null());
         assert!(spinyarn_deobfuscate(
             std::ptr::null_mut(),
             std::ptr::null(),

@@ -66,12 +66,12 @@ fn outcome_from(output: DeobfuscateOutput, version: String) -> DeobfuscateOutcom
 
 /// Shared pipeline for both JSON and plain-text handlers, delegating to the
 /// `Spinyarn` facade. The concurrency gate wraps only the load step; cache hits
-/// and the auto-download/ensure step stay gate-free (nothing loads on a hit).
+/// and the ensure step stay gate-free (nothing loads on a hit).
 async fn process(req: DeobfuscateRequest, state: &AppState) -> Result<DeobfuscateOutcome, ApiError> {
     let mtype = MappingType::parse(&req.mapping_type);
     let spinyarn = state.spinyarn.clone();
 
-    // 1. Ensure the mapping is available (may auto-download), off the gate.
+    // 1. Ensure the mapping file is available locally, off the gate.
     let version = req.version.clone();
     let engine = spinyarn.clone();
     let available = tokio::task::spawn_blocking(move || engine.ensure_available(&version, mtype))
