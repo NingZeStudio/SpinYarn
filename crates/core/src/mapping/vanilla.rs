@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 /// names like `a`/`b` repeat across classes), so members are indexed per class,
 /// and methods additionally by their TSRG line-range (to disambiguate overloads).
 /// Class names are globally unique.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct VanillaMappings {
     /// obfuscated class name -> readable class name
     classes: HashMap<String, String>,
@@ -52,10 +52,7 @@ impl VanillaMappings {
     /// when a line is available; falls back to the first entry for that name.
     pub fn lookup_method(&self, class_key: &str, name: &str, line: Option<u32>) -> Option<&str> {
         let class_obf = self.class_obf(class_key)?;
-        let ranges = self
-            .methods_by_class
-            .get(class_obf.as_ref())?
-            .get(name)?;
+        let ranges = self.methods_by_class.get(class_obf.as_ref())?.get(name)?;
         if let Some(line) = line {
             for (start, end, named) in ranges {
                 if line >= *start && line <= *end {
@@ -285,8 +282,9 @@ com.example.Other -> h:
     #[test]
     #[ignore]
     fn probe_real_client_txt() {
-        let content = std::fs::read_to_string("/data/data/com.termux/files/usr/tmp/opencode/client.txt")
-            .expect("client.txt missing");
+        let content =
+            std::fs::read_to_string("/data/data/com.termux/files/usr/tmp/opencode/client.txt")
+                .expect("client.txt missing");
         // Count how many member lines parse_field_line accepts in isolation.
         let mut field_parse = 0;
         let mut method_parse = 0;
@@ -333,7 +331,11 @@ com.example.Other -> h:
         let total_fields: usize = m.fields_by_class.values().map(|fm| fm.len()).sum();
         println!(
             "single-pass: methods={} fields={} | parsed: classes={} methods={} fields={}",
-            method_parse, field_parse, m.classes.len(), total_methods, total_fields
+            method_parse,
+            field_parse,
+            m.classes.len(),
+            total_methods,
+            total_fields
         );
         assert_eq!(total_methods, method_parse, "methods dropped");
         // Fields may collide on the same (class, obf) key (983 duplicates in
@@ -344,8 +346,14 @@ com.example.Other -> h:
             total_fields,
             field_parse
         );
-        assert_eq!(m.lookup_class("fda").as_deref(), Some("com.mojang.blaze3d.Blaze3D"));
-        assert_eq!(m.lookup_method("fda", "a", Some(9)), Some("youJustLostTheGame"));
+        assert_eq!(
+            m.lookup_class("fda").as_deref(),
+            Some("com.mojang.blaze3d.Blaze3D")
+        );
+        assert_eq!(
+            m.lookup_method("fda", "a", Some(9)),
+            Some("youJustLostTheGame")
+        );
         // readable class key + line-range disambiguation
         assert_eq!(
             m.lookup_method("com.mojang.blaze3d.Blaze3D", "b", Some(13)),

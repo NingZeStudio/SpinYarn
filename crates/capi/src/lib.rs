@@ -75,6 +75,24 @@ pub extern "C" fn spinyarn_init(mappings_dir: *const c_char) -> *mut spinyarn_ha
     }
 }
 
+#[no_mangle]
+pub extern "C" fn spinyarn_init_redis(
+    mappings_dir: *const c_char,
+    redis_url: *const c_char,
+) -> *mut spinyarn_handle {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let dir = resolve_dir(mappings_dir);
+        if redis_url.is_null() {
+            return std::ptr::null_mut();
+        }
+        let url = unsafe { std::ffi::CStr::from_ptr(redis_url) }.to_string_lossy();
+        Box::into_raw(Box::new(spinyarn_handle {
+            inner: Spinyarn::from_redis_settings(&dir, &url),
+        }))
+    }));
+    result.unwrap_or(std::ptr::null_mut())
+}
+
 /// # Safety
 /// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
 /// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default).
@@ -154,10 +172,15 @@ pub extern "C" fn spinyarn_deobfuscate(
             .to_string_lossy()
             .into_owned();
         let content = unsafe {
-            std::str::from_utf8(std::slice::from_raw_parts(content.cast::<u8>(), content_len))
-                .unwrap_or("")
+            std::str::from_utf8(std::slice::from_raw_parts(
+                content.cast::<u8>(),
+                content_len,
+            ))
+            .unwrap_or("")
         };
-        let out = handle.inner.deobfuscate(content, &version, to_mapping_type(mapping_type));
+        let out = handle
+            .inner
+            .deobfuscate(content, &version, to_mapping_type(mapping_type));
         // A log can contain NUL bytes in principle; CString stops at the first
         // NUL, so truncate the payload to the first NUL to keep the C contract
         // well-defined. Real MC logs are NUL-free.
@@ -322,7 +345,10 @@ mod tests {
         );
         assert!(!result.is_null());
         let text = unsafe { std::ffi::CStr::from_ptr(spinyarn_result_text(result)) };
-        assert_eq!(text.to_str().unwrap(), "at net.minecraft.class_1234.method_5678(X.java:1)");
+        assert_eq!(
+            text.to_str().unwrap(),
+            "at net.minecraft.class_1234.method_5678(X.java:1)"
+        );
         assert_eq!(spinyarn_result_classes(result), 0);
         spinyarn_result_free(result);
 

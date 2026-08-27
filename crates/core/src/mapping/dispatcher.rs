@@ -35,6 +35,7 @@ impl MappingType {
 }
 
 /// A loaded mapping set (Arc-shared), dispatched to the matching engine.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum LoadedMappings {
     Yarn(Arc<Mappings>),
     Vanilla(Arc<VanillaMappings>),
@@ -53,7 +54,10 @@ pub fn local_path(version: &str, mappings_dir: &str, mtype: MappingType) -> std:
 /// Refuses invalid version tokens (path traversal) regardless of caller.
 pub fn remove_local(version: &str, mappings_dir: &str, mtype: MappingType) -> bool {
     if !is_valid_version(version) {
-        tracing::warn!("refusing to remove mapping with invalid version: {:?}", version);
+        tracing::warn!(
+            "refusing to remove mapping with invalid version: {:?}",
+            version
+        );
         return false;
     }
     let path = local_path(version, mappings_dir, mtype);
@@ -71,7 +75,11 @@ pub fn remove_all_local(version: &str, mappings_dir: &str) -> Vec<String> {
     let mut removed = Vec::new();
     for mtype in [MappingType::Yarn, MappingType::Vanilla] {
         if remove_local(version, mappings_dir, mtype) {
-            removed.push(local_path(version, mappings_dir, mtype).to_string_lossy().into_owned());
+            removed.push(
+                local_path(version, mappings_dir, mtype)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         }
     }
     removed
@@ -126,7 +134,8 @@ mod tests {
     use std::io::Write;
 
     fn tmp_dir(tag: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("spinyarn-dispatch-{}-{}", tag, std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("spinyarn-dispatch-{}-{}", tag, std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -146,7 +155,8 @@ mod tests {
         let dir = tmp_dir("vanilla");
         std::fs::create_dir_all(dir.join("vanilla")).unwrap();
         let mut f = std::fs::File::create(dir.join("vanilla").join("1.21.4.txt")).unwrap();
-        f.write_all(b"com.example.Main -> a:\n    0:10:void init() -> b\n").unwrap();
+        f.write_all(b"com.example.Main -> a:\n    0:10:void init() -> b\n")
+            .unwrap();
 
         let loaded = load("1.21.4", dir.to_str().unwrap(), MappingType::Vanilla)
             .unwrap()
@@ -172,11 +182,19 @@ mod tests {
         let dir = tmp_dir("traversal");
         // A valid version file is removed.
         std::fs::write(dir.join("1.21.9.tiny.gz"), b"x").unwrap();
-        assert!(remove_local("1.21.9", dir.to_str().unwrap(), MappingType::Yarn));
+        assert!(remove_local(
+            "1.21.9",
+            dir.to_str().unwrap(),
+            MappingType::Yarn
+        ));
         assert!(!dir.join("1.21.9.tiny.gz").exists());
 
         // A traversal version must be a no-op (and not delete anything).
-        assert!(!remove_local("../../etc/passwd", dir.to_str().unwrap(), MappingType::Yarn));
+        assert!(!remove_local(
+            "../../etc/passwd",
+            dir.to_str().unwrap(),
+            MappingType::Yarn
+        ));
         assert!(remove_all_local("..", dir.to_str().unwrap()).is_empty());
 
         std::fs::remove_dir_all(&dir).unwrap();

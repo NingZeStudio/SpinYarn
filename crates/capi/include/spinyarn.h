@@ -38,6 +38,7 @@ _Static_assert(SPINYARN_YARN == 0 && SPINYARN_VANILLA == 1,
  * Returns NULL on failure.
  */
 spinyarn_handle_t *spinyarn_init(const char *mappings_dir);
+spinyarn_handle_t *spinyarn_init_redis(const char *mappings_dir, const char *redis_url);
 
 /*
  * Full MySQLi-style positional configuration (no config file).

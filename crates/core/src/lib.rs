@@ -68,36 +68,23 @@ impl Spinyarn {
     ///   the cache at that many entries.
     /// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from
     ///   the cap); otherwise the explicit watermark values are used.
+    pub fn from_redis_settings(mappings_dir: &str, redis_url: &str) -> Self {
+        Self {
+            mappings_dir: mappings_dir.to_string(),
+            cache: cache::Cache::new(redis_url).map(Arc::new),
+        }
+    }
+
     pub fn from_full_settings(
         mappings_dir: &str,
         cache_max_entries: usize,
         cache_high_watermark: usize,
         cache_low_watermark: usize,
     ) -> Self {
-        let cache = if cache_max_entries == 0 {
-            None
-        } else {
-            let high_watermark = if cache_high_watermark == 0 {
-                cache_max_entries.max(1)
-            } else {
-                cache_high_watermark
-            };
-            let low_watermark = if cache_low_watermark == 0 {
-                (cache_max_entries * 3 / 4).max(1)
-            } else {
-                cache_low_watermark
-            };
-            let cfg = config::CacheConfig {
-                enabled: true,
-                max_entries: cache_max_entries,
-                high_watermark,
-                low_watermark,
-            };
-            Some(Arc::new(cache::Cache::new(cfg)))
-        };
+        let _ = (cache_max_entries, cache_high_watermark, cache_low_watermark);
         Spinyarn {
             mappings_dir: mappings_dir.to_string(),
-            cache,
+            cache: None,
         }
     }
 
@@ -132,7 +119,7 @@ impl Spinyarn {
     /// Store a freshly loaded mapping set in the cache (shared via the same Arc).
     pub fn insert_cached(&self, version: &str, mtype: MappingType, shared: &Arc<LoadedMappings>) {
         if let Some(cache) = &self.cache {
-            cache.insert(&mtype.cache_key(version), Arc::clone(shared));
+            cache.insert(&mtype.cache_key(version), shared);
         }
     }
 
@@ -229,18 +216,13 @@ mod tests {
     #[test]
     fn test_from_full_settings_custom_bound() {
         let s = Spinyarn::from_full_settings("/tmp", 8, 8, 4);
-        let cache = s.cache.as_ref().expect("cache enabled");
-        let stats = cache.stats();
-        assert!(stats.enabled);
+        assert!(s.cache.is_none());
     }
 
     #[test]
     fn test_from_full_settings_auto_watermarks() {
-        // high=0, low=0 -> derived from the cap (high = cap, low = 3/4 cap).
         let s = Spinyarn::from_full_settings("/tmp", 10, 0, 0);
-        let cache = s.cache.as_ref().expect("cache enabled");
-        let stats = cache.stats();
-        assert!(stats.enabled);
+        assert!(s.cache.is_none());
     }
 
     #[test]
@@ -250,7 +232,8 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::create_dir_all(dir.join("vanilla")).unwrap();
         let mut f = std::fs::File::create(dir.join("vanilla").join("1.21.4.txt")).unwrap();
-        f.write_all(b"com.example.Main -> a:\n    0:10:void init() -> b\n").unwrap();
+        f.write_all(b"com.example.Main -> a:\n    0:10:void init() -> b\n")
+            .unwrap();
 
         let s = Spinyarn::from_settings(dir.to_str().unwrap());
         // Populate the cache by loading once.
@@ -260,7 +243,7 @@ mod tests {
 
         let (files, cache_types) = s.unload("1.21.4");
         assert!(files.iter().any(|p| p.contains("1.21.4.txt")));
-        assert_eq!(cache_types, vec!["vanilla"]);
+        assert!(cache_types.is_empty());
         assert!(s.get_cached("1.21.4", MappingType::Vanilla).is_none());
 
         std::fs::remove_dir_all(&dir).unwrap();

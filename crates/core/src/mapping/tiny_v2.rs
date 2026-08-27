@@ -4,7 +4,7 @@ use std::collections::HashMap;
 /// Only entries whose keys match the obfuscated `class_`/`method_`/`field_`
 /// prefix are kept; entries already using readable official names (e.g. `run`,
 /// `add`) are dropped to avoid corrupting arbitrary log text.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Mappings {
     pub classes: HashMap<String, String>,
     pub methods: HashMap<String, String>,

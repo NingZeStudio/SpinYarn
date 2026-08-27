@@ -54,16 +54,18 @@ static spinyarn_handle_t *fetch_handle(zval *z)
 PHP_FUNCTION(spinyarn_init)
 {
     zend_string *mappings_dir = NULL;
+    zend_string *redis_url = NULL;
     zend_long cache_max_entries = 44;
     zend_long cache_high_watermark = 40;
     zend_long cache_low_watermark = 30;
 
-    ZEND_PARSE_PARAMETERS_START(0, 4)
+    ZEND_PARSE_PARAMETERS_START(0, 5)
         Z_PARAM_OPTIONAL
         Z_PARAM_STR_OR_NULL(mappings_dir)
         Z_PARAM_LONG(cache_max_entries)
         Z_PARAM_LONG(cache_high_watermark)
         Z_PARAM_LONG(cache_low_watermark)
+        Z_PARAM_STR_OR_NULL(redis_url)
     ZEND_PARSE_PARAMETERS_END();
 
     if (cache_max_entries < 0) {
@@ -76,7 +78,9 @@ PHP_FUNCTION(spinyarn_init)
         cache_low_watermark = 0;
     }
 
-    spinyarn_handle_t *handle = spinyarn_init_full(
+    spinyarn_handle_t *handle = redis_url
+        ? spinyarn_init_redis(mappings_dir ? ZSTR_VAL(mappings_dir) : NULL, ZSTR_VAL(redis_url))
+        : spinyarn_init_full(
         mappings_dir ? ZSTR_VAL(mappings_dir) : NULL,
         (size_t)cache_max_entries,
         (size_t)cache_high_watermark,
@@ -177,6 +181,7 @@ PHP_FUNCTION(spinyarn_version)
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_init, 0, 0, 0)
     ZEND_ARG_TYPE_INFO(0, mappings_dir, IS_STRING, 1)
+    ZEND_ARG_TYPE_INFO(0, redis_url, IS_STRING, 1)
     ZEND_ARG_TYPE_INFO(0, cache_max_entries, IS_LONG, 1)
     ZEND_ARG_TYPE_INFO(0, cache_high_watermark, IS_LONG, 1)
     ZEND_ARG_TYPE_INFO(0, cache_low_watermark, IS_LONG, 1)
