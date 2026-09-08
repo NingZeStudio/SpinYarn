@@ -181,10 +181,10 @@ PHP_FUNCTION(spinyarn_version)
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_init, 0, 0, 0)
     ZEND_ARG_TYPE_INFO(0, mappings_dir, IS_STRING, 1)
-    ZEND_ARG_TYPE_INFO(0, redis_url, IS_STRING, 1)
     ZEND_ARG_TYPE_INFO(0, cache_max_entries, IS_LONG, 1)
     ZEND_ARG_TYPE_INFO(0, cache_high_watermark, IS_LONG, 1)
     ZEND_ARG_TYPE_INFO(0, cache_low_watermark, IS_LONG, 1)
+    ZEND_ARG_TYPE_INFO(0, redis_url, IS_STRING, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_deobfuscate, 0, 0, 3)

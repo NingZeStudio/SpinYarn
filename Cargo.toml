@@ -1,6 +1,6 @@
 [package]
 name = "spinyarn"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "Minecraft 日志反混淆服务（Axum Web API）"
 

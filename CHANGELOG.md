@@ -2,6 +2,21 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [v1.1.0] - 2026-09-08
+
+> 1.0 之后的首个功能版本：映射缓存迁移至 Redis（跨进程共享解析结果）。非破坏性发布，v1.0.0 的全部调用方式保持可用。
+
+### 新增
+- **Redis 映射缓存**：解析后的映射序列化存入 Redis，多进程/多实例共享，免去每进程重复解析。核心入口 `Spinyarn::from_redis_settings(mappings_dir, redis_url)`；Redis 不可达时缓存层缺省，映射按需从磁盘解析，正确性不受影响
+- **C ABI**：`spinyarn_init_redis(mappings_dir, redis_url)`
+- **PHP 扩展**：`spinyarn_init()` 新增可选第 5 参 `?string $redis_url`（解析顺序为 mappings_dir → cache_max_entries → cache_high_watermark → cache_low_watermark → redis_url）；传入 `redis_url` 时走 Redis 缓存模式
+
+### 变更
+- **本地 LRU 缓存移除**：`cache.rs` 重写为 Redis 后端；`from_full_settings`/`new` 的缓存水位参数保留以兼容 ABI 但不再生效（文档注释已同步说明）
+
+### 修复
+- PHP 扩展 `arginfo_spinyarn_init` 的参数声明顺序与 `ZEND_PARSE_PARAMETERS` 实际解析顺序对齐（`redis_url` 归位末位），修正反射参数名与具名实参解析错位
+
 ## [v1.0.0] - 2026-08-22
 
 > 首个正式版（LTS）。冻结自 v1.0.0-pre.2：映射表由宿主提供、SpinYarn 只负责「本地加载 + 解析 + LRU 缓存」。

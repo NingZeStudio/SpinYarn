@@ -34,8 +34,10 @@ pub struct DeobfuscateOutput {
 }
 
 impl Spinyarn {
-    /// Build an engine from a loaded [`config::Config`], honouring every cache
-    /// field (bound + watermarks) exactly as configured.
+    /// Build an engine from a loaded [`config::Config`]. The cache fields
+    /// (bound + watermarks) are accepted for config compatibility but no
+    /// longer take effect: the mapping cache is Redis-only (see
+    /// [`Spinyarn::from_redis_settings`]).
     pub fn new(config: &config::Config) -> Self {
         Self::from_full_settings(
             &config.maven.mappings_dir,
@@ -49,8 +51,8 @@ impl Spinyarn {
         )
     }
 
-    /// Build an engine from explicit settings (no config file), with the
-    /// default LRU cache configuration. Used by the C ABI's short init.
+    /// Build an engine from explicit settings (no config file), no cache.
+    /// Used by the C ABI's short init.
     pub fn from_settings(mappings_dir: &str) -> Self {
         let d = config::CacheConfig::default();
         Self::from_full_settings(
@@ -61,13 +63,10 @@ impl Spinyarn {
         )
     }
 
-    /// Build an engine from the full explicit settings set (no config file),
-    /// MySQLi-style positional configuration.
-    ///
-    /// - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps
-    ///   the cache at that many entries.
-    /// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from
-    ///   the cap); otherwise the explicit watermark values are used.
+    /// Build an engine whose mapping cache is backed by Redis (serialized
+    /// parsed mappings shared across processes/instances). When the Redis
+    /// connection cannot be established the cache is simply absent: parsing
+    /// falls back to on-demand disk reads, correctness unaffected.
     pub fn from_redis_settings(mappings_dir: &str, redis_url: &str) -> Self {
         Self {
             mappings_dir: mappings_dir.to_string(),
@@ -75,6 +74,12 @@ impl Spinyarn {
         }
     }
 
+    /// Build an engine from the full explicit settings set (no config file),
+    /// MySQLi-style positional configuration.
+    ///
+    /// The cache parameters are accepted for ABI compatibility but ignored
+    /// since v1.1.0: the local LRU cache was replaced by the Redis-backed
+    /// cache (see [`Spinyarn::from_redis_settings`]).
     pub fn from_full_settings(
         mappings_dir: &str,
         cache_max_entries: usize,
