@@ -11,7 +11,12 @@ use crate::cache::CacheStats;
 pub struct HealthResponse {
     pub status: &'static str,
     pub uptime_seconds: u64,
+    /// Shared-cache stats. The Web API runs on-demand with no local cache, so
+    /// this stays `None` in the default deployment; only Redis-backed embeds
+    /// report `Some`. Kept for backward compatibility.
     pub cache: Option<CacheStats>,
+    /// Cumulative mapping load failures (corrupt/unreadable files).
+    pub load_errors: u64,
 }
 
 #[utoipa::path(
@@ -35,10 +40,12 @@ pub async fn handler(
     };
 
     let cache = state.spinyarn.cache_stats();
+    let load_errors = state.spinyarn.load_errors();
 
     Json(crate::api::response::ApiResponse::success(HealthResponse {
         status: "healthy",
         uptime_seconds: uptime,
         cache,
+        load_errors,
     }))
 }

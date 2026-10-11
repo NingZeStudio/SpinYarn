@@ -6,6 +6,7 @@ pub mod config;
 pub mod deobfuscator;
 pub mod mapping;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use deobfuscator::DeobfuscateResult;
@@ -13,14 +14,18 @@ use mapping::dispatcher::{self, LoadedMappings, MappingType};
 
 /// A self-contained deobfuscation engine instance.
 ///
-/// Owns the mappings directory, auto-download toggle, and (optionally) the LRU
+/// Owns the mappings directory and (optionally) the Redis-backed shared
 /// cache. This is the synchronous facade used by both the C ABI and any other
 /// embedding host; it also exposes the deobfuscation pipeline as granular steps
 /// so the Axum binary can wrap the load step with a concurrency gate while
 /// keeping cache hits gate-free.
+///
+/// Caching exists only in the Redis form: without a `redis_url` the engine
+/// parses mappings from disk on demand (no local LRU).
 pub struct Spinyarn {
     mappings_dir: String,
     cache: Option<Arc<cache::Cache>>,
+    load_errors: AtomicU64,
 }
 
 /// Statistics for one deobfuscation pass (mirrors the JSON API shape).
@@ -49,32 +54,62 @@ impl Spinyarn {
         )
     }
 
-    /// Build an engine from explicit settings (no config file), with the
-    /// default LRU cache configuration. Used by the C ABI's short init.
+    /// Build an engine from explicit settings (no config file) without a
+    /// cache: mappings are parsed from disk on demand. Used by the C ABI's
+    /// short init.
     pub fn from_settings(mappings_dir: &str) -> Self {
-        let d = config::CacheConfig::default();
-        Self::from_full_settings(
-            mappings_dir,
-            d.max_entries,
-            d.high_watermark,
-            d.low_watermark,
-        )
-    }
-
-    /// Build an engine from the full explicit settings set (no config file),
-    /// MySQLi-style positional configuration.
-    ///
-    /// - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps
-    ///   the cache at that many entries.
-    /// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from
-    ///   the cap); otherwise the explicit watermark values are used.
-    pub fn from_redis_settings(mappings_dir: &str, redis_url: &str) -> Self {
         Self {
             mappings_dir: mappings_dir.to_string(),
-            cache: cache::Cache::new(redis_url).map(Arc::new),
+            cache: None,
+            load_errors: AtomicU64::new(0),
         }
     }
 
+    /// Build a Redis-backed engine from explicit settings (no config file),
+    /// MySQLi-style positional configuration.
+    ///
+    /// - `redis_url`: e.g. `redis://host:6379/0`; empty = no cache.
+    /// - `cache_max_entries`: 0 = disable the cache; a positive value caps
+    ///   the shared pool at that many entries.
+    /// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from
+    ///   the cap); otherwise the explicit watermark values are used.
+    ///
+    /// An unreachable Redis also yields a cache-less engine (fail open);
+    /// probing `cache_stats().is_none()` tells the two cases apart from a
+    /// live cache. This matches the PHP host contract: LogShare passes its
+    /// `spinyarn` water marks plus the URL derived from `cache.redis`, and
+    /// falls back to [`from_full_settings`] when this comes back cache-less.
+    pub fn from_redis_settings(
+        mappings_dir: &str,
+        redis_url: &str,
+        cache_max_entries: usize,
+        cache_high_watermark: usize,
+        cache_low_watermark: usize,
+    ) -> Self {
+        let cache = if redis_url.is_empty() {
+            None
+        } else {
+            cache::Cache::new(
+                redis_url,
+                cache_max_entries,
+                cache_high_watermark,
+                cache_low_watermark,
+            )
+            .map(Arc::new)
+        };
+        Self {
+            mappings_dir: mappings_dir.to_string(),
+            cache,
+            load_errors: AtomicU64::new(0),
+        }
+    }
+
+    /// Reserved MySQLi-style positional configuration (no config file).
+    ///
+    /// Accepted for C ABI / PHP signature compatibility only: the local LRU
+    /// was removed in the Redis migration, so this always builds an
+    /// on-demand (uncached) engine and ignores the bound arguments. Use
+    /// [`from_redis_settings`] for shared caching.
     pub fn from_full_settings(
         mappings_dir: &str,
         cache_max_entries: usize,
@@ -85,6 +120,7 @@ impl Spinyarn {
         Spinyarn {
             mappings_dir: mappings_dir.to_string(),
             cache: None,
+            load_errors: AtomicU64::new(0),
         }
     }
 
@@ -110,6 +146,7 @@ impl Spinyarn {
         match dispatcher::load(version, &self.mappings_dir, mtype) {
             Ok(loaded) => loaded,
             Err(e) => {
+                self.load_errors.fetch_add(1, Ordering::Relaxed);
                 tracing::warn!("load error for {} {}: {}", mtype.as_str(), version, e);
                 None
             }
@@ -162,8 +199,15 @@ impl Spinyarn {
     }
 
     /// Cache statistics (None when caching is disabled).
+    /// The Web API runs on-demand with no local cache, so this is normally
+    /// `None`; only Redis-backed embeds report `Some`.
     pub fn cache_stats(&self) -> Option<cache::CacheStats> {
         self.cache.as_ref().map(|c| c.stats())
+    }
+
+    /// Cumulative count of mapping load failures (`dispatcher::load` Err).
+    pub fn load_errors(&self) -> u64 {
+        self.load_errors.load(Ordering::Relaxed)
     }
 
     /// Remove a version's local files (both families) and drop cache entries.
@@ -226,6 +270,21 @@ mod tests {
     }
 
     #[test]
+    fn test_from_redis_settings_disabled_or_unreachable_is_cacheless() {
+        // 0 = disabled.
+        let s = Spinyarn::from_redis_settings("/tmp", "redis://127.0.0.1:6379/", 0, 0, 0);
+        assert!(s.cache.is_none());
+        // Empty URL = no cache requested.
+        let s = Spinyarn::from_redis_settings("/tmp", "", 10, 10, 7);
+        assert!(s.cache.is_none());
+        // Unreachable Redis fails open to a cache-less engine (host falls back
+        // to on-demand parsing instead of running silently uncached).
+        let s = Spinyarn::from_redis_settings("/tmp", "redis://127.0.0.1:1/", 10, 10, 7);
+        assert!(s.cache.is_none());
+        assert!(s.cache_stats().is_none());
+    }
+
+    #[test]
     fn test_unload_removes_files_and_cache() {
         let dir = std::env::temp_dir().join(format!("spinyarn-unload-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -256,5 +315,22 @@ mod tests {
         let out = s.deobfuscate("at a.b(X.java:1)", "25w44a", MappingType::Yarn);
         assert_eq!(out.deobfuscated, "at a.b(X.java:1)");
         assert_eq!(out.classes_mapped, 0);
+    }
+
+    #[test]
+    fn test_load_errors_counter() {
+        let dir = std::env::temp_dir().join(format!("spinyarn-load-err-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // Corrupt gzip: file exists so `load` hits the Err branch.
+        std::fs::write(dir.join("1.21.9.tiny.gz"), b"not-gzip").unwrap();
+        let s = Spinyarn::from_settings(dir.to_str().unwrap());
+        assert_eq!(s.load_errors(), 0);
+        assert!(s.load("1.21.9", MappingType::Yarn).is_none());
+        assert_eq!(s.load_errors(), 1);
+        // Missing file is Ok(None), not an error.
+        assert!(s.load("1.21.10", MappingType::Yarn).is_none());
+        assert_eq!(s.load_errors(), 1);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

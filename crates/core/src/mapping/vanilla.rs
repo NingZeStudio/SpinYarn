@@ -60,7 +60,7 @@ impl VanillaMappings {
                 }
             }
         }
-        Some(&ranges[0].2)
+        Some(&ranges.first().expect("method ranges non-empty").2)
     }
 
     pub fn lookup_field(&self, class_key: &str, name: &str) -> Option<&str> {
@@ -127,11 +127,14 @@ pub fn parse_tsrg(input: &str) -> Result<VanillaMappings, VanillaParseError> {
                     .entry(obf)
                     .or_default()
                     .push((start, end, named));
-            } else if let Some((named, obf)) = parse_field_line(body) {
-                m.fields_by_class
-                    .entry(class_obf.to_string())
-                    .or_default()
-                    .insert(obf, named);
+            } else if !body.contains('(') {
+                // L3：含 '(' 的行只可能是畸形方法行，不再掉进 field 表污染。
+                if let Some((named, obf)) = parse_field_line(body) {
+                    m.fields_by_class
+                        .entry(class_obf.to_string())
+                        .or_default()
+                        .insert(obf, named);
+                }
             }
             // Unknown member shape: skip (tolerant parsing).
         } else if let Some((named, obf)) = parse_class_line(trimmed) {
@@ -277,6 +280,15 @@ com.example.Other -> h:
     fn test_constructor() {
         let m = parse_tsrg("com.x.Y -> z:\n    0:5:void <init>() -> <init>\n").unwrap();
         assert_eq!(m.lookup_method("z", "<init>", Some(2)), Some("<init>"));
+    }
+
+    #[test]
+    fn test_malformed_method_line_not_in_field_table() {
+        // L3：含 '(' 但方法解析失败的畸形行不应进入 field 表。
+        let bad = "com.example.Main -> a:\n    bogus method(line -> x\n    int ok -> y\n";
+        let m = parse_tsrg(bad).unwrap();
+        assert!(m.lookup_field("a", "x").is_none());
+        assert_eq!(m.lookup_field("a", "y"), Some("ok"));
     }
 
     #[test]

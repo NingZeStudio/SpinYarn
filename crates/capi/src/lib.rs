@@ -75,20 +75,50 @@ pub extern "C" fn spinyarn_init(mappings_dir: *const c_char) -> *mut spinyarn_ha
     }
 }
 
+/// # Safety
+/// `mappings_dir`/`redis_url` must be valid NUL-terminated C strings (each may
+/// be NULL: NULL `mappings_dir` falls back to the `SPINYARN_MAPPINGS_DIR` /
+/// `exe_dir()` default).
+///
+/// Redis-backed shared cache with MySQLi-style positional bounds:
+/// - `cache_max_entries`: 0 = disable the cache; positive caps the pool.
+/// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto.
+/// - `redis_url`: e.g. `redis://host:6379/0` (NULL/empty = no cache).
+///
+/// Returns NULL when no cache could be established (NULL/empty/unreachable
+/// URL, or `cache_max_entries == 0`) so the host can fail open to
+/// `spinyarn_init_full` (on-demand parsing). A non-NULL handle always carries
+/// a live cache; use `spinyarn_init_full` directly for cache-less operation.
 #[no_mangle]
 pub extern "C" fn spinyarn_init_redis(
     mappings_dir: *const c_char,
+    cache_max_entries: usize,
+    cache_high_watermark: usize,
+    cache_low_watermark: usize,
     redis_url: *const c_char,
 ) -> *mut spinyarn_handle {
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let dir = resolve_dir(mappings_dir);
         if redis_url.is_null() {
             return std::ptr::null_mut();
         }
         let url = unsafe { std::ffi::CStr::from_ptr(redis_url) }.to_string_lossy();
-        Box::into_raw(Box::new(spinyarn_handle {
-            inner: Spinyarn::from_redis_settings(&dir, &url),
-        }))
+        if url.is_empty() {
+            return std::ptr::null_mut();
+        }
+        let dir = resolve_dir(mappings_dir);
+        let inner = Spinyarn::from_redis_settings(
+            &dir,
+            &url,
+            cache_max_entries,
+            cache_high_watermark,
+            cache_low_watermark,
+        );
+        // Fail-open signal: no live cache -> NULL, the host retries cache-less
+        // instead of running silently uncached.
+        if inner.cache_stats().is_none() {
+            return std::ptr::null_mut();
+        }
+        Box::into_raw(Box::new(spinyarn_handle { inner }))
     }));
     result.unwrap_or(std::ptr::null_mut())
 }
@@ -97,11 +127,17 @@ pub extern "C" fn spinyarn_init_redis(
 /// `mappings_dir` must be a valid NUL-terminated C string (or NULL to use the
 /// `SPINYARN_MAPPINGS_DIR`/`exe_dir()` default).
 ///
-/// Full MySQLi-style positional config:
-/// - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps the
-///   cache at that many entries.
-/// - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from the
-///   cap); otherwise used verbatim.
+/// Full MySQLi-style positional config (no config file).
+///
+/// Reserved for ABI compatibility: the local LRU was removed in the Redis
+/// migration, so this always builds an on-demand (uncached) engine and the
+/// bound arguments are ignored. Use `spinyarn_init_redis` for shared caching.
+///
+/// - `mappings_dir`: directory holding the mapping files (NULL = default).
+/// - `cache_max_entries` / `cache_high_watermark` / `cache_low_watermark`:
+///   accepted but currently ignored (0 = disable/auto, as before).
+///
+/// Returns NULL on failure.
 #[no_mangle]
 pub extern "C" fn spinyarn_init_full(
     mappings_dir: *const c_char,
@@ -352,6 +388,40 @@ mod tests {
         assert_eq!(spinyarn_result_classes(result), 0);
         spinyarn_result_free(result);
 
+        spinyarn_free(handle);
+    }
+
+    #[test]
+    fn test_init_redis_null_when_no_cache_possible() {
+        // NULL URL.
+        assert!(spinyarn_init_redis(std::ptr::null(), 10, 10, 7, std::ptr::null()).is_null());
+        // Empty URL.
+        let empty = CString::new("").unwrap();
+        assert!(spinyarn_init_redis(std::ptr::null(), 10, 10, 7, empty.as_ptr()).is_null());
+        // Unreachable Redis fails open to NULL (host retries cache-less).
+        let bad = CString::new("redis://127.0.0.1:1/").unwrap();
+        assert!(spinyarn_init_redis(std::ptr::null(), 10, 10, 7, bad.as_ptr()).is_null());
+        // 0 = disabled.
+        let url = CString::new("redis://127.0.0.1:6379/").unwrap();
+        assert!(spinyarn_init_redis(std::ptr::null(), 0, 0, 0, url.as_ptr()).is_null());
+    }
+
+    #[test]
+    fn test_init_full_is_cacheless_but_functional() {
+        let handle = spinyarn_init_full(std::ptr::null(), 44, 40, 30);
+        assert!(!handle.is_null());
+        // Snapshot version passes through unchanged.
+        let content = CString::new("at net.minecraft.class_1234.method_5678(X.java:1)").unwrap();
+        let version = CString::new("25w44a").unwrap();
+        let result = spinyarn_deobfuscate(
+            handle,
+            content.as_ptr(),
+            content.as_bytes().len(),
+            version.as_ptr(),
+            spinyarn_mapping_type_t::SPINYARN_YARN,
+        );
+        assert!(!result.is_null());
+        spinyarn_result_free(result);
         spinyarn_free(handle);
     }
 

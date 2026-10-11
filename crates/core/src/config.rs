@@ -4,6 +4,9 @@ use std::path::PathBuf;
 /// Default request body limit (64MB).
 pub const DEFAULT_MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
 
+/// Upper bound for the request body limit (256MB).
+pub const MAX_BODY_SIZE_LIMIT: usize = 256 * 1024 * 1024;
+
 /// Directory containing the running executable. Default locations for the
 /// config file and the external mappings dir are resolved relative to it,
 /// so the binary can be run from anywhere with its mappings/ next to it.
@@ -22,6 +25,8 @@ pub struct Config {
     pub maven: MavenConfig,
     #[serde(default)]
     pub cache: CacheConfig,
+    #[serde(default)]
+    pub admin: AdminConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -34,6 +39,19 @@ pub struct ServerConfig {
     pub max_body_size: usize,
     #[serde(default = "default_max_concurrency")]
     pub max_concurrency: usize,
+    /// CORS whitelist for the write (admin) routes. Empty = deny cross-origin
+    /// (no `Access-Control-Allow-Origin` emitted). Public routes keep a
+    /// permissive `Any` policy; see `src/api/mod.rs`.
+    #[serde(default)]
+    pub cors_origins: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct AdminConfig {
+    /// Admin token guarding the write mapping endpoints. Empty = writes
+    /// disabled (all return 403). Overridden by `SPINYARN_ADMIN_TOKEN` (env wins).
+    #[serde(default)]
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -66,7 +84,11 @@ fn default_mappings_dir() -> String {
         .unwrap_or_else(|| exe_dir().join("mappings").to_string_lossy().into_owned())
 }
 
-/// In-memory LRU cache of parsed mappings with watermark eviction.
+/// Reserved cache bounds (kept for config-file compatibility).
+/// The local LRU was removed in the Redis migration: the Web API currently
+/// parses mappings on demand, and shared caching lives behind
+/// `Spinyarn::from_redis_settings` (PHP/C ABI `spinyarn_init` 5th arg).
+/// The fields still parse/serialize so old `config.toml` files keep working.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CacheConfig {
     #[serde(default = "default_cache_enabled")]
@@ -110,6 +132,7 @@ impl Default for ServerConfig {
             port: default_port(),
             max_body_size: default_max_body_size(),
             max_concurrency: default_max_concurrency(),
+            cors_origins: Vec::new(),
         }
     }
 }
@@ -123,6 +146,15 @@ impl Default for MavenConfig {
 }
 
 impl Config {
+    /// Apply environment overrides (env wins over file). Currently only the
+    /// admin token: `SPINYARN_ADMIN_TOKEN` replaces `[admin] token` when set.
+    fn apply_env_overrides(mut self) -> Self {
+        if let Ok(v) = std::env::var("SPINYARN_ADMIN_TOKEN") {
+            self.admin.token = v;
+        }
+        self
+    }
+
     pub fn load() -> Self {
         let config_paths = [
             exe_dir().join("config.toml"),
@@ -137,7 +169,8 @@ impl Config {
                     Ok(content) => match toml::from_str(&content) {
                         Ok(config) => {
                             tracing::info!("Loaded config from {}", path.display());
-                            return config;
+                            let config: Self = config;
+                            return config.apply_env_overrides();
                         }
                         Err(e) => {
                             tracing::warn!("Failed to parse {}: {}", path.display(), e);
@@ -170,6 +203,6 @@ impl Config {
         }
 
         tracing::info!("No config file found, using defaults");
-        default
+        default.apply_env_overrides()
     }
 }

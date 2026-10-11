@@ -6,9 +6,19 @@ PHP_ARG_ENABLE([spinyarn],
     [Enable spinyarn support])],
   [no])
 
+PHP_ARG_WITH([spinyarn-libdir],
+  [directory containing libspinyarn_capi],
+  [AS_HELP_STRING([--with-spinyarn-libdir=DIR],
+    [Directory containing libspinyarn_capi (default: SPINYARN_LIBDIR env or $srcdir/../../target/release)])],
+  [no])
+
 if test "$PHP_SPINYARN" != "no"; then
-  dnl Locate libspinyarn_capi. Prefer an explicit SPINYARN_LIBDIR, then the
-  dnl Rust target/release directory relative to the extension source.
+  dnl Locate libspinyarn_capi. Explicit --with-spinyarn-libdir wins, then the
+  dnl SPINYARN_LIBDIR environment, then the Rust target/release directory
+  dnl relative to the extension source.
+  if test "$PHP_SPINYARN_LIBDIR" != "no"; then
+    SPINYARN_LIBDIR="$PHP_SPINYARN_LIBDIR"
+  fi
   if test -z "$SPINYARN_LIBDIR"; then
     SPINYARN_LIBDIR="$srcdir/../../target/release"
   fi

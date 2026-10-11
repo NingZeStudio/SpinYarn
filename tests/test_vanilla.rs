@@ -19,37 +19,52 @@ fn test_vanilla_realistic_log() {
 
     // 混淆类+方法，行号定位重载（flk.a 行 771 -> addInitialScreens）
     assert!(
-        out.text.contains("at net.minecraft.client.Minecraft.addInitialScreens(SourceFile.java:771)"),
+        out.text
+            .contains("at net.minecraft.client.Minecraft.addInitialScreens(SourceFile.java:771)"),
         "got: {}",
         out.text
     );
     // flk.f 行 910 -> run
-    assert!(out.text.contains("at net.minecraft.client.Minecraft.run(SourceFile.java:910)"));
+    assert!(out
+        .text
+        .contains("at net.minecraft.client.Minecraft.run(SourceFile.java:910)"));
     // ard.<init> -> ServerLevel.<init>
-    assert!(
-        out.text.contains("at net.minecraft.server.level.ServerLevel.<init>(SourceFile.java:5)")
-    );
+    assert!(out
+        .text
+        .contains("at net.minecraft.server.level.ServerLevel.<init>(SourceFile.java:5)"));
     // fda.b 行 13 -> getTime；fda.<init>
-    assert!(out.text.contains("at com.mojang.blaze3d.Blaze3D.getTime(SourceFile.java:13)"));
-    assert!(out.text.contains("at com.mojang.blaze3d.Blaze3D.<init>(SourceFile.java:17)"));
+    assert!(out
+        .text
+        .contains("at com.mojang.blaze3d.Blaze3D.getTime(SourceFile.java:13)"));
+    assert!(out
+        .text
+        .contains("at com.mojang.blaze3d.Blaze3D.<init>(SourceFile.java:17)"));
 
     // Caused by 栈内：flk.a 行 730 -> onResourceLoadFinished（同混淆名不同行号）
-    assert!(
-        out.text.contains("at net.minecraft.client.Minecraft.onResourceLoadFinished(SourceFile.java:730)")
-    );
+    assert!(out
+        .text
+        .contains("at net.minecraft.client.Minecraft.onResourceLoadFinished(SourceFile.java:730)"));
     // flk.c 行 750 -> buildInitialScreens（重载 c：746 -> isGameLoadFinished）
-    assert!(
-        out.text.contains("at net.minecraft.client.Minecraft.buildInitialScreens(SourceFile.java:750)")
-    );
+    assert!(out
+        .text
+        .contains("at net.minecraft.client.Minecraft.buildInitialScreens(SourceFile.java:750)"));
 
     // java.base/ 模块前缀类未映射 -> 整行保留
     assert!(out.text.contains("at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)"));
-    assert!(out.text.contains("at java.base/java.lang.Thread.run(Thread.java:1583)"));
+    assert!(out
+        .text
+        .contains("at java.base/java.lang.Thread.run(Thread.java:1583)"));
 
     // 非堆栈行全部透传
-    assert!(out.text.contains("[12:34:56] [main/INFO]: Loading Minecraft 1.21.4 with Mojang mappings"));
-    assert!(out.text.contains("java.lang.RuntimeException: Failed to tick server"));
-    assert!(out.text.contains("Caused by: java.lang.NullPointerException"));
+    assert!(out
+        .text
+        .contains("[12:34:56] [main/INFO]: Loading Minecraft 1.21.4 with Mojang mappings"));
+    assert!(out
+        .text
+        .contains("java.lang.RuntimeException: Failed to tick server"));
+    assert!(out
+        .text
+        .contains("Caused by: java.lang.NullPointerException"));
     assert!(out.text.contains("... 5 more"));
 
     // 统计（classes_mapped 为行数累加：flk×4 + ard + fda×2 = 7）
@@ -65,10 +80,19 @@ fn test_vanilla_line_range_disambiguation() {
         "    10:20:void foo() -> q\n",
         "    30:40:void bar() -> q\n",
     ));
-    assert_eq!(e.deobfuscate("at a.q(SourceFile.java:12)").text, "at com.x.Main.foo(SourceFile.java:12)");
-    assert_eq!(e.deobfuscate("at a.q(SourceFile.java:35)").text, "at com.x.Main.bar(SourceFile.java:35)");
+    assert_eq!(
+        e.deobfuscate("at a.q(SourceFile.java:12)").text,
+        "at com.x.Main.foo(SourceFile.java:12)"
+    );
+    assert_eq!(
+        e.deobfuscate("at a.q(SourceFile.java:35)").text,
+        "at com.x.Main.bar(SourceFile.java:35)"
+    );
     // 行号落空 -> 取第一个区间
-    assert_eq!(e.deobfuscate("at a.q(SourceFile.java:50)").text, "at com.x.Main.foo(SourceFile.java:50)");
+    assert_eq!(
+        e.deobfuscate("at a.q(SourceFile.java:50)").text,
+        "at com.x.Main.foo(SourceFile.java:50)"
+    );
 }
 
 #[test]
@@ -97,12 +121,23 @@ fn test_vanilla_unmapped_passthrough() {
 
 #[test]
 fn test_vanilla_constructor_and_unknown_source() {
-    let e = engine_from_tsrg("com.x.Y -> z:\n    0:5:void <init>() -> <init>\n    6:9:void go() -> w\n");
-    assert_eq!(e.deobfuscate("at z.<init>(SourceFile.java:3)").text, "at com.x.Y.<init>(SourceFile.java:3)");
+    let e = engine_from_tsrg(
+        "com.x.Y -> z:\n    0:5:void <init>() -> <init>\n    6:9:void go() -> w\n",
+    );
+    assert_eq!(
+        e.deobfuscate("at z.<init>(SourceFile.java:3)").text,
+        "at com.x.Y.<init>(SourceFile.java:3)"
+    );
     // (Unknown Source) 无行号 -> 方法按首个区间
-    assert_eq!(e.deobfuscate("at z.w(Unknown Source)").text, "at com.x.Y.go(Unknown Source)");
+    assert_eq!(
+        e.deobfuscate("at z.w(Unknown Source)").text,
+        "at com.x.Y.go(Unknown Source)"
+    );
     // (Native Method)
-    assert_eq!(e.deobfuscate("at z.w(Native Method)").text, "at com.x.Y.go(Native Method)");
+    assert_eq!(
+        e.deobfuscate("at z.w(Native Method)").text,
+        "at com.x.Y.go(Native Method)"
+    );
 }
 
 #[test]

@@ -32,8 +32,22 @@ jobs:
       - name: Check
         run: cargo check --workspace --all-targets
 
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Format
+        run: cargo fmt --check
+
       - name: Test
+        env:
+          SPINYARN_REQUIRE_MAPPINGS: "1"
         run: cargo test --workspace --all-targets
+
+      - name: Security audit
+        continue-on-error: true
+        run: |
+          cargo install cargo-audit --locked || echo "[warn] cargo-audit install failed (network restricted?), skipping"
+          cargo audit || echo "[warn] cargo audit reported issues or is unavailable (non-blocking)"
 
       - name: Build release
         run: cargo build --release --workspace

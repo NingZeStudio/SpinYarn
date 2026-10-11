@@ -2,6 +2,35 @@
 
 本项目版本号跟随 Cargo.toml。所有重要变更均记录于此。
 
+## [Unreleased]
+
+> 全仓审查修复：Redis 共享缓存补完、管理端点鉴权、解析引擎加固。本地 LRU 已彻底移除，无 `redis_url` 即按需解析。
+
+### 新增
+- **Redis 共享映射缓存**（`crates/core/src/cache.rs`）：跨进程共享解析结果，key 为 `spinyarn:mapping/<type>:<version>`（7 天 TTL），`spinyarn:mapping:lru` 有序集合记 recency（毫秒时间戳，命中即刷新）；达高水位批量淘汰最旧者至低水位；`get` 未命中懒清理过期/损坏条目；构造期 PING 失败直接无缓存 fail-open
+- **构造器**：`Spinyarn::from_redis_settings(dir, redis_url, max, high, low)`（0 = 禁用/自动，MySQLi 风格）；`from_full_settings` 兼容保留但恒为按需解析
+- **C ABI**：`spinyarn_init_redis(dir, max, high, low, redis_url)`，建不起缓存返回 NULL 供宿主回退按需模式
+- **PHP 扩展**：`spinyarn_init()` 第 5 参 `$redis_url`（水位透传，空串视同未配置）；修正 arginfo 参数顺序与解析顺序一致
+- **管理端点鉴权**：写端点（`load`/`load/local`/`unload`）需 `X-Admin-Token` 或 `Authorization: Bearer`（`config.toml [admin] token`，`SPINYARN_ADMIN_TOKEN` 环境变量覆盖，未配置时写操作 403）；写路由 CORS 仅白名单（`server.cors_origins`）
+- **`POST /api/v1/mappings/load`**：可用性探针（只查本地存在性，本引擎不下载，需 admin token）
+- **健康检查**：`GET /api/v1/health` 新增 `load_errors` 计数（映射加载失败累计）
+- **反混淆排队保护**：并发门 30s 超时后 429 + `Retry-After: 30`；同版本并发 singleflight 去重；`max_concurrency` 非法值 warn+修正（0→32，>1024 钳制）；`max_body_size` 上限 256MB
+
+### 修复/加固
+- **Tiny 解析**：列索引越界改返回错误（原 panic）；header 64 列上限；解压 256MB 上限防 zip bomb；预分配 cap 1M
+- **自映射不再虚增计数**：`named` 仍是混淆名自身的条目保留在表中（重建语义不变：去模块前缀、替换文件名照常，输出文本字节一致），但 `rep == key` 时不计入 `classes/methods/fields_mapped`
+- **嵌套类 `$` 键**：residual 正则整体捕获，全键命中、miss 回退外层；结构化类查找加前导边界与键形校验
+- **Vanilla**：含 `(` 的畸形方法行不再污染 field 表；堆栈行按第一个 `(` 定位 call 并校验
+- **非法输入一律 400**：未知 `mapping_type`（大小写不敏感）、非法 version token；非法 JSON 走统一错误包络（缺字段 422）
+- **管理端点**：`load/local` 原子安装（临时文件+fsync+rename）+ 读写两端 symlink 拒绝 + 解析校验；成功响应只返相对路径；`list`/`load/local` 移入 `spawn_blocking`
+- **下载脚本**：版本号白名单、argv 传参、`grep -F`、`.sha1`/`size` 校验、vanilla 域名白名单 + 256MB 上限
+- **测试/CI**：`test.sh` 补管理端点/包络/openapi 指纹/vanilla 全链路/大包/并发/零并发回归；CI 加 clippy(`-D warnings`)/fmt/audit；快照缺映射时 `SPINYARN_REQUIRE_MAPPINGS=1` 直接失败
+
+### 破坏性变更
+- `spinyarn_init_redis` C 签名 2 参→5 参（随本仓同源重编的 PHP 扩展同步更新，外部 C 调用方需跟进）
+- 本地 LRU 移除：`spinyarn_init`/`spinyarn_init_full` 恒按需解析（PHP 侧传水位仅在 redis 模式下生效）
+- 未知 `mapping_type` 过去静默按 yarn 处理，现返回 400；`load/local` 损坏映射过去覆盖安装，现拒绝并 400
+
 ## [v1.0.0] - 2026-08-22
 
 > 首个正式版（LTS）。冻结自 v1.0.0-pre.2：映射表由宿主提供、SpinYarn 只负责「本地加载 + 解析 + LRU 缓存」。

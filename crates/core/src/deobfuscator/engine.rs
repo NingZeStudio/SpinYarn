@@ -65,7 +65,11 @@ impl LineEngine {
 
         for line in input.split_inclusive('\n') {
             let newline = line.ends_with('\n');
-            let text = if newline { &line[..line.len() - 1] } else { line };
+            let text = if newline {
+                &line[..line.len() - 1]
+            } else {
+                line
+            };
             let text = text.strip_suffix('\r').unwrap_or(text);
 
             if let Some((mapped, ch, mh)) = self.map_stack_line(text) {
@@ -111,13 +115,18 @@ impl LineEngine {
         }
         let body = &content[3..];
 
-        let open = body.rfind('(')?;
+        // L4：用第一个 '(' 定位 call 起点（`rfind` 会误吞 suffix 中的括号），
+        // 并要求 call 内无空白/括号，否则走降级路径。
+        let open = body.find('(')?;
         let close = body.rfind(')')?;
         if close <= open {
             return None;
         }
         let paren = &body[open + 1..close];
         let call = &body[..open];
+        if call.contains(' ') || call.contains('\t') || call.contains('(') || call.contains(')') {
+            return None;
+        }
         let suffix = &body[close + 1..];
 
         let dot = call.rfind('.')?;
@@ -135,11 +144,15 @@ impl LineEngine {
         }
 
         let mut method_hit = false;
+        let mut method_counted = false;
         let mut new_method = method.to_string();
         if method.starts_with("method_") {
             if let Some(named) = self.mappings.methods.get(method) {
                 new_method = named.clone();
                 method_hit = true;
+                // Yarn 未命名方法（named == key）仍参与重建（去模块前缀、
+                // 替换文件名），但不计数：计入会虚增 methods_mapped。
+                method_counted = named != method;
             }
         }
 
@@ -167,7 +180,10 @@ impl LineEngine {
         out.push(')');
         out.push_str(suffix);
 
-        Some((out, class_hit, method_hit))
+        // 诚实计数：类名替换前后文本一致（如输入已是可读全名）时不计数，
+        // 但重建照常（方法/文件名可能仍有变化）。
+        let class_counted = class_hit && new_class_part != class_part;
+        Some((out, class_counted, method_counted))
     }
 
     /// Remap an obfuscated class name inside the `(file:line)` part of a stack
@@ -196,40 +212,88 @@ impl LineEngine {
             .classes
             .get(key)
             .or_else(|| self.mappings.nested.get(key))
-            .or_else(|| key.rfind('$').and_then(|d| self.mappings.classes.get(&key[..d])))
+            .or_else(|| {
+                key.rfind('$')
+                    .and_then(|d| self.mappings.classes.get(&key[..d]))
+            })
         else {
             return paren.to_string();
         };
 
         let short = named.rsplit('/').next().unwrap_or(named);
-        format!("{}{}{}{}", &file[..pos], short, &file[pos + key.len()..], line)
+        format!(
+            "{}{}{}{}",
+            &file[..pos],
+            short,
+            &file[pos + key.len()..],
+            line
+        )
     }
 
     /// Look up an obfuscated class key embedded in a class path segment.
     /// Handles `class_310`, `class_11980$class_11981`, and falls back to the
     /// outer class when an anonymous/nested-class key is not present in the table.
+    /// L5：`class_` 前须为行首/`/`/`.`/`$`，键体严格为 `class_\d+` 加 `$` 嵌套，
+    /// 与 residual 正则键形状一致（如 `Xclass_1`、`class_abc` 不命中）。
     fn lookup_class(&self, class_part: &str) -> Option<&str> {
-        // Find the FIRST `class_` so nested keys like `class_11980$class_11981`
-        // are captured whole rather than truncated at the inner `class_`.
-        let pos = class_part.find("class_")?;
-        let rest = &class_part[pos..];
-        let end = rest
-            .bytes()
-            .take_while(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
-            .count();
-        let key = &rest[..end];
-        if key.len() <= "class_".len() {
-            return None;
-        }
+        let bytes = class_part.as_bytes();
+        let mut from = 0usize;
+        while let Some(rel) = class_part[from..].find("class_") {
+            let pos = from + rel;
+            // 前导字符检查。
+            if pos > 0 && !matches!(bytes[pos - 1], b'.' | b'/' | b'$') {
+                from = pos + "class_".len();
+                continue;
+            }
+            // 键体：`class_` 后至少一位数字。
+            let mut end = pos + "class_".len();
+            let digits = end;
+            while end < bytes.len() && bytes[end].is_ascii_digit() {
+                end += 1;
+            }
+            if end == digits {
+                from = pos + "class_".len();
+                continue;
+            }
+            // 嵌套后缀：`$class_数字` 可重复出现。
+            loop {
+                if end + "$class_".len() <= bytes.len()
+                    && &class_part[end..end + "$class_".len()] == "$class_"
+                {
+                    let mut d = end + "$class_".len();
+                    let ds = d;
+                    while d < bytes.len() && bytes[d].is_ascii_digit() {
+                        d += 1;
+                    }
+                    if d == ds {
+                        break;
+                    }
+                    end = d;
+                } else {
+                    break;
+                }
+            }
+            let key = &class_part[pos..end];
+            // 键后紧跟单词字符说明是更长标识符的一部分（如 `class_12x`），跳过。
+            if end < bytes.len() && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_') {
+                from = pos + "class_".len();
+                continue;
+            }
 
-        if let Some(named) = self.mappings.classes.get(key) {
-            return Some(named);
-        }
-        if let Some(named) = self.mappings.nested.get(key) {
-            return Some(named);
-        }
-        if let Some(dollar) = key.rfind('$') {
-            return self.mappings.classes.get(&key[..dollar]).map(|s| s.as_str());
+            if let Some(named) = self.mappings.classes.get(key) {
+                return Some(named);
+            }
+            if let Some(named) = self.mappings.nested.get(key) {
+                return Some(named);
+            }
+            if let Some(dollar) = key.rfind('$') {
+                return self
+                    .mappings
+                    .classes
+                    .get(&key[..dollar])
+                    .map(|s| s.as_str());
+            }
+            return None;
         }
         None
     }
@@ -253,23 +317,32 @@ impl LineEngine {
         let mut fields = 0usize;
 
         for caps in RESIDUAL_PATTERN.captures_iter(line) {
-            let m = caps.get(0).unwrap();
+            let m = caps.get(0).expect("regex 全匹配存在");
             let pre = caps.name("pre").map(|p| p.as_str()).unwrap_or("");
             let key = caps
                 .name("key1")
                 .or_else(|| caps.name("key2"))
-                .unwrap()
+                .expect("key1/key2 必居其一")
                 .as_str();
             let prefix = caps.name("prefix").map(|p| p.as_str()).unwrap_or("");
 
             let replacement = if key.starts_with("class_") {
-                self.mappings.classes.get(key).or_else(|| self.mappings.nested.get(key)).map(|n| {
-                    if prefix.contains('.') {
-                        n.replace('/', ".")
-                    } else {
-                        n.clone()
-                    }
-                })
+                // M4：先查全键（含 `$` 嵌套），miss 再回退外层，与 lookup_class 一致。
+                self.mappings
+                    .classes
+                    .get(key)
+                    .or_else(|| self.mappings.nested.get(key))
+                    .or_else(|| {
+                        key.rfind('$')
+                            .and_then(|d| self.mappings.classes.get(&key[..d]))
+                    })
+                    .map(|n| {
+                        if prefix.contains('.') {
+                            n.replace('/', ".")
+                        } else {
+                            n.clone()
+                        }
+                    })
             } else if key.starts_with("method_") {
                 self.mappings.methods.get(key).cloned()
             } else {
@@ -278,12 +351,16 @@ impl LineEngine {
 
             let Some(rep) = replacement else { continue };
 
-            if key.starts_with("class_") {
-                classes += 1;
-            } else if key.starts_with("method_") {
-                methods += 1;
-            } else {
-                fields += 1;
+            // 诚实计数：替换前后文本一致（Yarn 未命名条目）时不计数，
+            // 但替换照做（输出字节与过去完全一致）。
+            if rep != key {
+                if key.starts_with("class_") {
+                    classes += 1;
+                } else if key.starts_with("method_") {
+                    methods += 1;
+                } else {
+                    fields += 1;
+                }
             }
             changed = true;
             out.push_str(&line[last..m.start()]);
@@ -297,5 +374,88 @@ impl LineEngine {
         }
         out.push_str(&line[last..]);
         Some((out, classes, methods, fields))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn engine_with(classes: &[(&str, &str)], methods: &[(&str, &str)]) -> LineEngine {
+        let m = Mappings {
+            classes: classes
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect::<HashMap<_, _>>(),
+            methods: methods
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect::<HashMap<_, _>>(),
+            fields: HashMap::new(),
+            nested: HashMap::new(),
+        };
+        LineEngine::new(m)
+    }
+
+    #[test]
+    fn test_residual_nested_full_key_and_outer_fallback() {
+        // M4：全键命中与 miss 回退外层。
+        let e = engine_with(
+            &[
+                ("class_10$class_11", "com/Outer$Inner"),
+                ("class_20", "com/Outer"),
+            ],
+            &[],
+        );
+        let r = e.deobfuscate("oops class_10$class_11 broken");
+        assert!(r.text.contains("com/Outer$Inner"), "全键应命中：{}", r.text);
+        let r2 = e.deobfuscate("oops class_20$class_99 broken");
+        assert!(
+            r2.text.contains("com/Outer"),
+            "未知内层应回退外层：{}",
+            r2.text
+        );
+    }
+
+    #[test]
+    fn test_stack_line_uses_first_paren() {
+        // L4：suffix 含括号时仍按第一个 '(' 定位 call。
+        let e = engine_with(&[("class_1", "com/A")], &[("method_1", "foo")]);
+        let r = e.deobfuscate("at class_1.method_1(Source.java:1) (extra)");
+        assert_eq!(r.text, "at com.A.foo(Source.java:1) (extra)");
+    }
+
+    #[test]
+    fn test_stack_line_call_with_space_falls_back() {
+        // L4：call 含空白时不走结构化映射（不 panic，结果由残留路径决定）。
+        let e = engine_with(&[("class_1", "com/A")], &[]);
+        assert!(e.map_stack_line("at class_1.foo bar(Foo.java:1)").is_none());
+    }
+
+    #[test]
+    fn test_self_mapped_counts_zero_but_line_rebuilt() {
+        // M3（引擎层诚实计数）：自映射方法仍触发重建（去模块前缀），但不计数。
+        let e = engine_with(&[("class_1", "com/A")], &[("method_1", "method_1")]);
+        let r = e.deobfuscate("at knot//com.A.method_1(Foo.java:1)");
+        assert_eq!(r.text, "at com.A.method_1(Foo.java:1)");
+        assert_eq!(r.classes_mapped, 0);
+        assert_eq!(r.methods_mapped, 0);
+        // 残留路径同样：文本照换（此处无变化），计数为 0。
+        let r2 = e.deobfuscate("oops method_1 broken");
+        assert_eq!(r2.text, "oops method_1 broken");
+        assert_eq!(r2.methods_mapped, 0);
+    }
+
+    #[test]
+    fn test_lookup_class_rejects_bad_prefix_and_shape() {
+        // L5：`Xclass_1`（前导单词字符）与 `class_abc`（非数字键体）不命中。
+        let e = engine_with(&[("class_1", "com/A")], &[]);
+        assert_eq!(e.lookup_class("Xclass_1"), None);
+        assert_eq!(e.lookup_class("class_abc"), None);
+        assert_eq!(e.lookup_class("class_1"), Some("com/A"));
+        // 栈行侧同样透传。
+        let line = "at Xclass_1.foo(Foo.java:1)";
+        assert_eq!(e.deobfuscate(line).text, line);
     }
 }

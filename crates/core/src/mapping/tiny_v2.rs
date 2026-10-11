@@ -50,6 +50,13 @@ pub enum TinyV2ParseError {
     NamespaceNotFound(String),
 }
 
+/// Header 列数上限：正常 tiny 头仅 4~6 列，超限视为畸形输入。
+/// 防止恶意超长 header 导致 `ns + 2` 等定位值远超 `cols` 长度。
+const MAX_HEADER_COLS: usize = 64;
+
+/// `collect_cols` 返回的栈上列数组长度（`take(6)`）。
+const MAX_COLS: usize = 6;
+
 /// Namespace column positions within a header line (absolute indices).
 #[derive(Debug, Clone)]
 struct NamespacePositions {
@@ -62,6 +69,9 @@ struct NamespacePositions {
 impl NamespacePositions {
     fn parse(header: &str) -> Result<Self, TinyV2ParseError> {
         let parts: Vec<&str> = header.split('\t').collect();
+        if parts.len() > MAX_HEADER_COLS {
+            return Err(TinyV2ParseError::InvalidHeader);
+        }
 
         let find = |name: &str| -> Result<usize, TinyV2ParseError> {
             parts
@@ -78,17 +88,17 @@ impl NamespacePositions {
         })
     }
 
-    fn v1_class_col(&self, ns: usize) -> usize {
-        ns
+    fn v1_class_col(&self, ns: usize) -> Option<usize> {
+        Some(ns).filter(|&v| v < MAX_COLS)
     }
-    fn v1_member_col(&self, ns: usize) -> usize {
-        ns + 2
+    fn v1_member_col(&self, ns: usize) -> Option<usize> {
+        ns.checked_add(2).filter(|&v| v < MAX_COLS)
     }
-    fn v2_class_col(&self, ns: usize) -> usize {
-        ns - 2
+    fn v2_class_col(&self, ns: usize) -> Option<usize> {
+        ns.checked_sub(2).filter(|&v| v < MAX_COLS)
     }
-    fn v2_member_col(&self, ns: usize) -> usize {
-        ns - 1
+    fn v2_member_col(&self, ns: usize) -> Option<usize> {
+        ns.checked_sub(1).filter(|&v| v < MAX_COLS)
     }
 }
 
@@ -110,11 +120,14 @@ fn collect_cols(line: &str) -> [Option<&str>; 6] {
 }
 
 /// Rough pre-allocation for the lookup tables based on line count.
+/// 上限 1M 条目：`line_count` 来自输入长度计数，不设上限时畸形超大输入
+/// 会一次性申请巨大 HashMap 而 OOM。
 fn prealloc(line_count: usize) -> Mappings {
+    const CAP: usize = 1 << 20;
     Mappings {
-        classes: HashMap::with_capacity(line_count / 10),
-        methods: HashMap::with_capacity(line_count / 2),
-        fields: HashMap::with_capacity(line_count / 2),
+        classes: HashMap::with_capacity(std::cmp::min(line_count / 10, CAP)),
+        methods: HashMap::with_capacity(std::cmp::min(line_count / 2, CAP)),
+        fields: HashMap::with_capacity(std::cmp::min(line_count / 2, CAP)),
         nested: HashMap::new(),
     }
 }
@@ -145,7 +158,10 @@ fn collect_nested(
 fn finalize_nested(m: &mut Mappings, candidates: HashMap<String, Vec<String>>) {
     for (inner, names) in candidates {
         if names.len() == 1 {
-            m.nested.insert(inner, names.into_iter().next().unwrap());
+            m.nested.insert(
+                inner,
+                names.into_iter().next().expect("len == 1 has one name"),
+            );
         }
     }
 }
@@ -180,7 +196,10 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
     let mut m = prealloc(line_count);
     let mut nested_candidates: HashMap<String, Vec<String>> = HashMap::new();
     let mut lines = input.lines();
-    let header = lines.next().unwrap().trim_end_matches('\r');
+    let header = lines
+        .next()
+        .expect("parse()已校验首行存在")
+        .trim_end_matches('\r');
     let ns = NamespacePositions::parse(header)?;
 
     for line in lines {
@@ -192,8 +211,11 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
         let cols = collect_cols(line);
         match cols[0] {
             Some("CLASS") => {
-                let i = ns.v1_class_col(ns.intermediary);
-                let n = ns.v1_class_col(ns.named);
+                let (Some(i), Some(n)) =
+                    (ns.v1_class_col(ns.intermediary), ns.v1_class_col(ns.named))
+                else {
+                    return Err(TinyV2ParseError::InvalidClassLine);
+                };
                 let (Some(ik), Some(named)) = (cols[i], cols[n]) else {
                     return Err(TinyV2ParseError::InvalidClassLine);
                 };
@@ -204,8 +226,12 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
                 collect_nested(&mut m, key, named, &mut nested_candidates);
             }
             Some("FIELD") => {
-                let i = ns.v1_member_col(ns.intermediary);
-                let n = ns.v1_member_col(ns.named);
+                let (Some(i), Some(n)) = (
+                    ns.v1_member_col(ns.intermediary),
+                    ns.v1_member_col(ns.named),
+                ) else {
+                    return Err(TinyV2ParseError::InvalidFieldLine);
+                };
                 let (Some(ik), Some(named)) = (cols[i], cols[n]) else {
                     return Err(TinyV2ParseError::InvalidFieldLine);
                 };
@@ -216,8 +242,12 @@ fn parse_v1(input: &str) -> Result<Mappings, TinyV2ParseError> {
                 m.fields.insert(key.to_owned(), named.to_owned());
             }
             Some("METHOD") => {
-                let i = ns.v1_member_col(ns.intermediary);
-                let n = ns.v1_member_col(ns.named);
+                let (Some(i), Some(n)) = (
+                    ns.v1_member_col(ns.intermediary),
+                    ns.v1_member_col(ns.named),
+                ) else {
+                    return Err(TinyV2ParseError::InvalidMethodLine);
+                };
                 let (Some(ik), Some(named)) = (cols[i], cols[n]) else {
                     return Err(TinyV2ParseError::InvalidMethodLine);
                 };
@@ -270,8 +300,11 @@ fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
 
         match cols[0] {
             Some("c") if leading == 0 => {
-                let i = ns.v2_class_col(ns.intermediary);
-                let n = ns.v2_class_col(ns.named);
+                let (Some(i), Some(n)) =
+                    (ns.v2_class_col(ns.intermediary), ns.v2_class_col(ns.named))
+                else {
+                    return Err(TinyV2ParseError::InvalidClassLine);
+                };
                 let (Some(ik), Some(named)) = (cols[i], cols[n]) else {
                     return Err(TinyV2ParseError::InvalidClassLine);
                 };
@@ -282,8 +315,12 @@ fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
                 collect_nested(&mut m, key, named, &mut nested_candidates);
             }
             Some("f") if leading == 1 => {
-                let i = ns.v2_member_col(ns.intermediary);
-                let n = ns.v2_member_col(ns.named);
+                let (Some(i), Some(n)) = (
+                    ns.v2_member_col(ns.intermediary),
+                    ns.v2_member_col(ns.named),
+                ) else {
+                    return Err(TinyV2ParseError::InvalidFieldLine);
+                };
                 let (Some(ik), Some(named)) = (cols[i], cols[n]) else {
                     return Err(TinyV2ParseError::InvalidFieldLine);
                 };
@@ -294,8 +331,12 @@ fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
                 m.fields.insert(key.to_owned(), named.to_owned());
             }
             Some("m") if leading == 1 => {
-                let i = ns.v2_member_col(ns.intermediary);
-                let n = ns.v2_member_col(ns.named);
+                let (Some(i), Some(n)) = (
+                    ns.v2_member_col(ns.intermediary),
+                    ns.v2_member_col(ns.named),
+                ) else {
+                    return Err(TinyV2ParseError::InvalidMethodLine);
+                };
                 let (Some(ik), Some(named)) = (cols[i], cols[n]) else {
                     return Err(TinyV2ParseError::InvalidMethodLine);
                 };
@@ -311,4 +352,45 @@ fn parse_v2(input: &str) -> Result<Mappings, TinyV2ParseError> {
 
     finalize_nested(&mut m, nested_candidates);
     Ok(m)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_v1_member_col_out_of_bounds_returns_error_not_panic() {
+        // M1：header 把 named 推到远超 6 列，`ns + 2` 越界时应返回错误而非 panic。
+        let mut header = String::from("v1\tofficial\tintermediary");
+        for i in 0..10 {
+            header.push_str(&format!("\tpad{}", i));
+        }
+        header.push_str("\tnamed");
+        let input = format!("{}\nCLASS\tofficialX\tclass_1\tcom.Example\n", header);
+        let r = parse(input.as_bytes());
+        assert!(r.is_err(), "越界列应返回错误");
+    }
+
+    #[test]
+    fn test_header_too_many_columns_rejected() {
+        // M1：header 列数超过上限直接拒绝。
+        let mut header = String::from("tiny\t2\t0");
+        for i in 0..70 {
+            header.push_str(&format!("\tns{}", i));
+        }
+        let input = format!("{}\n", header);
+        assert!(matches!(
+            parse(input.as_bytes()),
+            Err(TinyV2ParseError::InvalidHeader)
+        ));
+    }
+
+    #[test]
+    fn test_prealloc_capped_for_huge_line_count() {
+        // L2：超大 line_count 下预分配应被 cap 住而非按 line_count/2 申请。
+        let m = prealloc(1usize << 32);
+        assert!(m.methods.capacity() <= (1 << 20) * 2);
+        assert!(m.fields.capacity() <= (1 << 20) * 2);
+        assert!(m.classes.capacity() <= (1 << 20) * 2);
+    }
 }

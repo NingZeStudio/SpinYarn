@@ -22,16 +22,26 @@ fn load_mappings_opt(version: &str) -> Option<Mappings> {
 }
 
 fn deobfuscate_fixture(fixture: &str, version: &str) -> String {
-    let content = std::fs::read_to_string(fixture)
-        .unwrap_or_else(|e| panic!("read {}: {}", fixture, e));
+    let content =
+        std::fs::read_to_string(fixture).unwrap_or_else(|e| panic!("read {}: {}", fixture, e));
     let engine = LineEngine::new(load_mappings_opt(version).unwrap());
     engine.deobfuscate(&content).text
 }
 
 /// Skip the test when the external mapping for `version` is missing.
+/// Opt-in strictness: with `SPINYARN_REQUIRE_MAPPINGS=1` (CI) a missing
+/// mapping panics instead of silently skipping, so regressions can't hide
+/// behind absent files. Default keeps the fresh-clone-friendly skip.
 macro_rules! require_mapping {
     ($version:expr) => {
         if load_mappings_opt($version).is_none() {
+            if std::env::var("SPINYARN_REQUIRE_MAPPINGS").as_deref() == Ok("1") {
+                panic!(
+                    "mappings/{}.tiny.gz not present (SPINYARN_REQUIRE_MAPPINGS=1); \
+                     run scripts/download_mappings.sh {}",
+                    $version, $version
+                );
+            }
             eprintln!(
                 "[skip] mappings/{}.tiny.gz not present; \
                  run scripts/download_mappings.sh {}",

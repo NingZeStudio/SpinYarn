@@ -18,7 +18,11 @@
  *                                        (derived from the cap). Default 40.
  * @param int  $cache_low_watermark       Low watermark to evict down to; 0 = auto.
  *                                        Default 30.
- * @param string|null $redis_url           Optional Redis URL for serialized mapping cache.
+ * @param string|null $redis_url           Optional Redis URL (e.g. "redis://host:6379/0")
+ *                                        for the shared cross-process mapping cache;
+ *                                        NULL/empty = on-demand parsing (no cache).
+ *                                        Unreachable Redis fails init (false) so the
+ *                                        host can retry without caching.
  * @return resource|false                 Engine handle resource, or false on failure.
  */
 function spinyarn_init(?string $mappings_dir = null, int $cache_max_entries = 44, int $cache_high_watermark = 40, int $cache_low_watermark = 30, ?string $redis_url = null) {}

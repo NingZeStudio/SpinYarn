@@ -13,10 +13,26 @@ pub enum MappingType {
 }
 
 impl MappingType {
+    /// Lenient parse kept for core-internal / C ABI compat: unknown (and
+    /// empty) values fall back to Yarn. Case-insensitive.
     pub fn parse(s: &str) -> MappingType {
-        match s {
-            "vanilla" => MappingType::Vanilla,
-            _ => MappingType::Yarn,
+        if s.eq_ignore_ascii_case("vanilla") {
+            MappingType::Vanilla
+        } else {
+            MappingType::Yarn
+        }
+    }
+
+    /// Strict parse for the HTTP API: empty defaults to Yarn (keeps the
+    /// `#[serde(default)]` deobfuscate body working), `yarn`/`vanilla`
+    /// case-insensitive, anything else is `None` so callers can return 400.
+    pub fn parse_result(s: &str) -> Option<MappingType> {
+        if s.is_empty() || s.eq_ignore_ascii_case("yarn") {
+            Some(MappingType::Yarn)
+        } else if s.eq_ignore_ascii_case("vanilla") {
+            Some(MappingType::Vanilla)
+        } else {
+            None
         }
     }
 
@@ -143,11 +159,32 @@ mod tests {
     #[test]
     fn test_mapping_type_parse() {
         assert_eq!(MappingType::parse("vanilla"), MappingType::Vanilla);
+        assert_eq!(MappingType::parse("Vanilla"), MappingType::Vanilla);
+        assert_eq!(MappingType::parse("VANILLA"), MappingType::Vanilla);
         assert_eq!(MappingType::parse("yarn"), MappingType::Yarn);
+        assert_eq!(MappingType::parse("YARN"), MappingType::Yarn);
         assert_eq!(MappingType::parse(""), MappingType::Yarn);
         assert_eq!(MappingType::parse("srg"), MappingType::Yarn);
         assert_eq!(MappingType::Yarn.cache_key("1.21.4"), "yarn:1.21.4");
         assert_eq!(MappingType::Vanilla.cache_key("1.21.4"), "vanilla:1.21.4");
+    }
+
+    #[test]
+    fn test_mapping_type_parse_result() {
+        // Empty defaults to Yarn (serde(default) deobfuscate body).
+        assert_eq!(MappingType::parse_result(""), Some(MappingType::Yarn));
+        assert_eq!(MappingType::parse_result("yarn"), Some(MappingType::Yarn));
+        assert_eq!(MappingType::parse_result("YARN"), Some(MappingType::Yarn));
+        assert_eq!(
+            MappingType::parse_result("vanilla"),
+            Some(MappingType::Vanilla)
+        );
+        assert_eq!(
+            MappingType::parse_result("Vanilla"),
+            Some(MappingType::Vanilla)
+        );
+        assert_eq!(MappingType::parse_result("srg"), None);
+        assert_eq!(MappingType::parse_result("mojang"), None);
     }
 
     #[test]

@@ -36,7 +36,11 @@ impl VanillaEngine {
 
         for line in input.split_inclusive('\n') {
             let newline = line.ends_with('\n');
-            let text = if newline { &line[..line.len() - 1] } else { line };
+            let text = if newline {
+                &line[..line.len() - 1]
+            } else {
+                line
+            };
             let text = text.strip_suffix('\r').unwrap_or(text);
 
             if let Some((mapped, ch, mh)) = self.map_stack_line(text) {
@@ -77,13 +81,17 @@ impl VanillaEngine {
         }
         let body = &content[3..];
 
-        let open = body.rfind('(')?;
+        // L4：用第一个 '(' 定位 call，并要求 call 无空白/括号，否则降级透传。
+        let open = body.find('(')?;
         let close = body.rfind(')')?;
         if close <= open {
             return None;
         }
         let paren = &body[open + 1..close];
         let call = &body[..open];
+        if call.contains(' ') || call.contains('\t') || call.contains('(') || call.contains(')') {
+            return None;
+        }
         let suffix = &body[close + 1..];
 
         let dot = call.rfind('.')?;
@@ -94,10 +102,8 @@ impl VanillaEngine {
         }
 
         // Class must resolve (obfuscated -> readable, or already-readable in map).
-        let (named_class, class_hit) = match self.mappings.lookup_class(class_part) {
-            Some(c) => (c.into_owned(), true),
-            None => return None,
-        };
+        let c = self.mappings.lookup_class(class_part)?;
+        let (named_class, class_hit) = (c.into_owned(), true);
 
         // Method resolves within the class; unmapped methods keep their name.
         let line_num = parse_line_number(paren);
@@ -158,7 +164,10 @@ com.example.Other -> h:
     fn test_method_line_disambiguation() {
         let e = engine_from_tsrg(MAP);
         // b maps to init for class a
-        assert_eq!(e.deobfuscate("at a.b(SourceFile.java:3)").text, "at com.example.Main.init(SourceFile.java:3)");
+        assert_eq!(
+            e.deobfuscate("at a.b(SourceFile.java:3)").text,
+            "at com.example.Main.init(SourceFile.java:3)"
+        );
     }
 
     #[test]
@@ -200,5 +209,18 @@ com.example.Other -> h:
         // (Unknown Source) has no line number -> method resolves via first range
         let r = e.deobfuscate("at a.b(Unknown Source)");
         assert_eq!(r.text, "at com.example.Main.init(Unknown Source)");
+    }
+
+    #[test]
+    fn test_first_paren_and_call_validation() {
+        // L4：suffix 括号不干扰 call 定位；call 含空白时整行透传。
+        let e = engine_from_tsrg(MAP);
+        let r = e.deobfuscate("at a.b(SourceFile.java:3) (extra)");
+        assert_eq!(
+            r.text,
+            "at com.example.Main.init(SourceFile.java:3) (extra)"
+        );
+        let bad = "at a.b c(SourceFile.java:3)";
+        assert_eq!(e.deobfuscate(bad).text, bad);
     }
 }

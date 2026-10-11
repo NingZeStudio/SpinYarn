@@ -78,13 +78,21 @@ PHP_FUNCTION(spinyarn_init)
         cache_low_watermark = 0;
     }
 
-    spinyarn_handle_t *handle = redis_url
-        ? spinyarn_init_redis(mappings_dir ? ZSTR_VAL(mappings_dir) : NULL, ZSTR_VAL(redis_url))
-        : spinyarn_init_full(
-        mappings_dir ? ZSTR_VAL(mappings_dir) : NULL,
-        (size_t)cache_max_entries,
-        (size_t)cache_high_watermark,
-        (size_t)cache_low_watermark);
+    spinyarn_handle_t *handle;
+    if (redis_url != NULL && ZSTR_LEN(redis_url) > 0) {
+        handle = spinyarn_init_redis(
+            mappings_dir ? ZSTR_VAL(mappings_dir) : NULL,
+            (size_t)cache_max_entries,
+            (size_t)cache_high_watermark,
+            (size_t)cache_low_watermark,
+            ZSTR_VAL(redis_url));
+    } else {
+        handle = spinyarn_init_full(
+            mappings_dir ? ZSTR_VAL(mappings_dir) : NULL,
+            (size_t)cache_max_entries,
+            (size_t)cache_high_watermark,
+            (size_t)cache_low_watermark);
+    }
     if (handle == NULL) {
         php_error_docref(NULL, E_WARNING, "failed to initialize Spinyarn");
         RETURN_FALSE;
@@ -181,10 +189,10 @@ PHP_FUNCTION(spinyarn_version)
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_init, 0, 0, 0)
     ZEND_ARG_TYPE_INFO(0, mappings_dir, IS_STRING, 1)
+    ZEND_ARG_TYPE_INFO(0, cache_max_entries, IS_LONG, 0)
+    ZEND_ARG_TYPE_INFO(0, cache_high_watermark, IS_LONG, 0)
+    ZEND_ARG_TYPE_INFO(0, cache_low_watermark, IS_LONG, 0)
     ZEND_ARG_TYPE_INFO(0, redis_url, IS_STRING, 1)
-    ZEND_ARG_TYPE_INFO(0, cache_max_entries, IS_LONG, 1)
-    ZEND_ARG_TYPE_INFO(0, cache_high_watermark, IS_LONG, 1)
-    ZEND_ARG_TYPE_INFO(0, cache_low_watermark, IS_LONG, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_spinyarn_deobfuscate, 0, 0, 3)

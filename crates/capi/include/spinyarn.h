@@ -34,19 +34,37 @@ _Static_assert(SPINYARN_YARN == 0 && SPINYARN_VANILLA == 1,
  * Create an engine from explicit settings (no config file).
  * - `mappings_dir`: directory holding the mapping files. Pass NULL to fall back
  *   to SPINYARN_MAPPINGS_DIR or <exe>/mappings.
- * Uses the default LRU cache bound.
- * Returns NULL on failure.
+ * Always builds an on-demand (uncached) engine; mappings are parsed from disk
+ * per miss. Returns NULL on failure.
  */
 spinyarn_handle_t *spinyarn_init(const char *mappings_dir);
-spinyarn_handle_t *spinyarn_init_redis(const char *mappings_dir, const char *redis_url);
 
 /*
- * Full MySQLi-style positional configuration (no config file).
+ * Redis-backed shared cache with MySQLi-style positional bounds (no config file).
  * - `mappings_dir`: directory holding the mapping files (NULL = default).
- * - `cache_max_entries`: 0 = disable the LRU cache; a positive value caps it at
- *   that many entries.
+ * - `cache_max_entries`: 0 = disable the cache; a positive value caps the
+ *   shared pool at that many entries.
  * - `cache_high_watermark` / `cache_low_watermark`: 0 = auto (derived from the
  *   cap); otherwise used verbatim.
+ * - `redis_url`: e.g. "redis://host:6379/0" (NULL/empty = no cache).
+ * Returns NULL when no cache could be established (NULL/empty/unreachable URL
+ * or `cache_max_entries == 0`) so the host can fail open to
+ * `spinyarn_init_full`. A non-NULL handle always carries a live cache.
+ */
+spinyarn_handle_t *spinyarn_init_redis(const char *mappings_dir,
+                                       size_t cache_max_entries,
+                                       size_t cache_high_watermark,
+                                       size_t cache_low_watermark,
+                                       const char *redis_url);
+
+/*
+ * Reserved MySQLi-style positional configuration (no config file).
+ * Accepted for ABI compatibility: the local LRU was removed in the Redis
+ * migration, so this always builds an on-demand (uncached) engine and the
+ * bound arguments are ignored. Use `spinyarn_init_redis` for shared caching.
+ * - `mappings_dir`: directory holding the mapping files (NULL = default).
+ * - `cache_max_entries` / `cache_high_watermark` / `cache_low_watermark`:
+ *   accepted but currently ignored.
  * Returns NULL on failure.
  */
 spinyarn_handle_t *spinyarn_init_full(const char *mappings_dir,

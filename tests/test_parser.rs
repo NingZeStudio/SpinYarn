@@ -19,8 +19,14 @@ fn test_parse_v1_fixture() {
     );
 
     assert_eq!(m.methods_len(), 2);
-    assert_eq!(m.methods.get("method_1234").map(String::as_str), Some("getCount"));
-    assert_eq!(m.methods.get("method_6004").map(String::as_str), Some("tick"));
+    assert_eq!(
+        m.methods.get("method_1234").map(String::as_str),
+        Some("getCount")
+    );
+    assert_eq!(
+        m.methods.get("method_6004").map(String::as_str),
+        Some("tick")
+    );
 
     assert_eq!(m.fields_len(), 2);
     assert_eq!(m.fields.get("field_8008").map(String::as_str), Some("size"));
@@ -41,8 +47,14 @@ fn test_parse_v2_fixture() {
         Some("net/minecraft/entity/Entity")
     );
 
-    assert_eq!(m.methods.get("method_1234").map(String::as_str), Some("getCount"));
-    assert_eq!(m.methods.get("method_6004").map(String::as_str), Some("tick"));
+    assert_eq!(
+        m.methods.get("method_1234").map(String::as_str),
+        Some("getCount")
+    );
+    assert_eq!(
+        m.methods.get("method_6004").map(String::as_str),
+        Some("tick")
+    );
 
     assert_eq!(m.fields.get("field_8008").map(String::as_str), Some("size"));
 }
@@ -61,7 +73,10 @@ fn test_filters_non_obfuscated_keys() {
                CLASS\ta\tnet/minecraft/class_1\tnet/minecraft/SomeClass\n\
                METHOD\ta\t()V\trun\trun\trun\n";
     let m = parse(v1).unwrap();
-    assert_eq!(m.classes.get("class_1").map(String::as_str), Some("net/minecraft/SomeClass"));
+    assert_eq!(
+        m.classes.get("class_1").map(String::as_str),
+        Some("net/minecraft/SomeClass")
+    );
     // `run` is not a method_ key -> excluded.
     assert!(m.methods.is_empty());
 }

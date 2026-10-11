@@ -43,9 +43,13 @@ fn test_unknown_source_and_native_method() {
     let r = engine.deobfuscate(
         "at net.minecraft.class_1297.method_6004(Unknown Source)\nat java.base/java.lang.Thread.run(Native Method)",
     );
-    assert!(r.text.contains("net.minecraft.entity.Entity.tick(Unknown Source)"));
+    assert!(r
+        .text
+        .contains("net.minecraft.entity.Entity.tick(Unknown Source)"));
     // Module prefix untouched, `run` not a method_ key -> unchanged.
-    assert!(r.text.contains("java.base/java.lang.Thread.run(Native Method)"));
+    assert!(r
+        .text
+        .contains("java.base/java.lang.Thread.run(Native Method)"));
 }
 
 #[test]
@@ -65,14 +69,21 @@ fn test_nested_class_full_key() {
                   METHOD\txb\t()V\tapply\tmethod_74450\tapply\n";
     let m = parse(input).unwrap();
     let engine = LineEngine::new(m);
-    let r = engine.deobfuscate("at knot/net.minecraft.class_11980$class_11981.method_74450(class_11980.java:55)");
+    let r = engine.deobfuscate(
+        "at knot/net.minecraft.class_11980$class_11981.method_74450(class_11980.java:55)",
+    );
     assert!(
-        r.text.contains("net.minecraft.network.PacketApplyBatcher$Entry.apply"),
+        r.text
+            .contains("net.minecraft.network.PacketApplyBatcher$Entry.apply"),
         "got: {}",
         r.text
     );
     // source file name remapped too
-    assert!(r.text.contains("(PacketApplyBatcher.java:55)"), "got: {}", r.text);
+    assert!(
+        r.text.contains("(PacketApplyBatcher.java:55)"),
+        "got: {}",
+        r.text
+    );
 }
 
 #[test]
@@ -84,15 +95,21 @@ fn test_stack_line_module_prefix_readable_class() {
                   METHOD\ta\t()V\trun\tmethod_1806\trun\n";
     let m = parse(input).unwrap();
     let engine = LineEngine::new(m);
-    let r = engine.deobfuscate("at knot//net.minecraft.server.MinecraftServer.method_1806(MinecraftServer.java:1755)");
+    let r = engine.deobfuscate(
+        "at knot//net.minecraft.server.MinecraftServer.method_1806(MinecraftServer.java:1755)",
+    );
     assert!(
-        r.text.contains("at net.minecraft.server.MinecraftServer.run(MinecraftServer.java:1755)"),
+        r.text
+            .contains("at net.minecraft.server.MinecraftServer.run(MinecraftServer.java:1755)"),
         "got: {}",
         r.text
     );
     // dotted module prefixes (java.base/) must stay intact on unmapped lines
     let r2 = engine.deobfuscate("at java.base/java.lang.Thread.run(Thread.java:1583)");
-    assert_eq!(r2.text, "at java.base/java.lang.Thread.run(Thread.java:1583)");
+    assert_eq!(
+        r2.text,
+        "at java.base/java.lang.Thread.run(Thread.java:1583)"
+    );
 }
 
 #[test]
@@ -113,7 +130,11 @@ fn test_prefix_conflict_class_31_vs_310() {
     let engine = LineEngine::new(m);
 
     let r = engine.deobfuscate("at net.minecraft.class_310.method_1234(X.java:1)");
-    assert!(r.text.contains("net.minecraft.ThreeHundredTen"), "got: {}", r.text);
+    assert!(
+        r.text.contains("net.minecraft.ThreeHundredTen"),
+        "got: {}",
+        r.text
+    );
     assert!(!r.text.contains("ThirtyOne"), "got: {}", r.text);
 }
 

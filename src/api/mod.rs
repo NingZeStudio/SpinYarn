@@ -1,15 +1,22 @@
-use axum::{extract::DefaultBodyLimit, response::Response, Json, Router};
+use axum::{
+    extract::DefaultBodyLimit,
+    http::{HeaderValue, Method},
+    response::Response,
+    Json, Router,
+};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::{AllowOrigin, Any, CorsLayer},
     trace::TraceLayer,
 };
 use tracing::{debug_span, info_span, Span};
 use utoipa::OpenApi;
 
 use crate::config::Config;
+use crate::error::ApiError;
 use crate::Spinyarn;
 
 mod deobfuscate;
@@ -24,6 +31,7 @@ mod response;
         deobfuscate::handler,
         deobfuscate::handler_plain,
         health::handler,
+        mappings::load_mapping,
         mappings::load_mapping_local,
         mappings::list_mappings,
         mappings::mapping_stats,
@@ -34,6 +42,8 @@ mod response;
         deobfuscate::DeobfuscateResponse,
         deobfuscate::DeobfuscateStats,
         health::HealthResponse,
+        mappings::LoadRequest,
+        mappings::LoadInfo,
         mappings::LoadLocalRequest,
         mappings::LoadedInfo,
         mappings::MappingsList,
@@ -50,12 +60,77 @@ mod response;
 )]
 struct ApiDoc;
 
-/// Router-wide state: the deobfuscation concurrency gate and the shared engine
-/// (which owns the mappings dir and LRU cache).
+/// Router-wide state: the deobfuscation concurrency gate, the shared engine
+/// (which owns the mappings dir and optional Redis cache), the admin token
+/// for write endpoints, and the per-key singleflight table.
 #[derive(Clone)]
 pub struct AppState {
     pub gate: Arc<Semaphore>,
     pub spinyarn: Arc<Spinyarn>,
+    pub admin_token: String,
+    /// In-flight per `(type, version)` mutexes. With a shared cache this
+    /// de-duplicates concurrent loads of the same key (second waiter hits the
+    /// cache after the first fills it); without a cache it serializes same-key
+    /// loads so a burst of identical versions cannot OOM with N parallel
+    /// ~10MB table parses.
+    pub inflight: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+}
+
+/// Constant-time token comparison (no `subtle` dependency).
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+/// Extract the caller token from `X-Admin-Token` or `Authorization: Bearer`.
+fn extract_admin_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    if let Some(v) = headers.get("x-admin-token") {
+        if let Ok(s) = v.to_str() {
+            let s = s.trim();
+            if !s.is_empty() {
+                return Some(s.to_string());
+            }
+        }
+    }
+    if let Some(v) = headers.get(axum::http::header::AUTHORIZATION) {
+        if let Ok(s) = v.to_str() {
+            let s = s.trim();
+            if let Some(tok) = s.strip_prefix("Bearer ") {
+                let tok = tok.trim();
+                if !tok.is_empty() {
+                    return Some(tok.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Guard for the write mapping endpoints (`load`, `load/local`, `unload`).
+/// Reads (`deobfuscate`, `list`, `stats`, `health`, `openapi`) stay open.
+/// Token source: `[admin] token` in config.toml,
+/// overridden by `SPINYARN_ADMIN_TOKEN` (env wins, applied in
+/// `Config::load`). Empty/unconfigured → 403 + warn (fail closed).
+pub fn require_admin(headers: &axum::http::HeaderMap, expected: &str) -> Result<(), ApiError> {
+    if expected.is_empty() {
+        tracing::warn!("admin token not configured; rejecting write operation");
+        return Err(ApiError::Forbidden(
+            "admin token not configured".to_string(),
+        ));
+    }
+    match extract_admin_token(headers) {
+        Some(got) if constant_time_eq(got.as_bytes(), expected.as_bytes()) => Ok(()),
+        _ => {
+            tracing::warn!("forbidden write operation: bad admin token");
+            Err(ApiError::Forbidden("forbidden".to_string()))
+        }
+    }
 }
 
 fn make_info_span(request: &axum::extract::Request) -> Span {
@@ -105,18 +180,45 @@ async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
     Json(api)
 }
 
-pub fn build_router(config: Config, spinyarn: Arc<Spinyarn>) -> Router {
-    let cors = CorsLayer::new()
+/// Permissive CORS for public (read/open) routes. These endpoints take no
+/// side effects, so cross-origin browser calls are harmless.
+fn public_cors() -> CorsLayer {
+    CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_headers(Any)
+}
 
+/// Restrictive CORS for write (admin) routes: only `server.cors_origins`
+/// origins are allowed. Default (empty whitelist) emits no
+/// `Access-Control-Allow-Origin`, i.e. browsers reject cross-origin writes.
+fn admin_cors(origins: &[String]) -> CorsLayer {
+    let methods = [Method::GET, Method::POST, Method::DELETE, Method::OPTIONS];
+    if origins.is_empty() {
+        CorsLayer::new().allow_methods(methods).allow_headers(Any)
+    } else {
+        let list: Vec<HeaderValue> = origins.iter().filter_map(|s| s.parse().ok()).collect();
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(list))
+            .allow_methods(methods)
+            .allow_headers(Any)
+    }
+}
+
+pub fn build_router(config: Config, spinyarn: Arc<Spinyarn>) -> Router {
     let info_trace = TraceLayer::new_for_http()
         .make_span_with(make_info_span)
         .on_response(on_response_info);
     let debug_trace = TraceLayer::new_for_http()
         .make_span_with(make_debug_span)
         .on_response(on_response_debug);
+
+    let state = AppState {
+        gate: Arc::new(Semaphore::new(config.server.max_concurrency)),
+        spinyarn,
+        admin_token: config.admin.token.clone(),
+        inflight: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+    };
 
     let deobfuscate_route: axum::routing::MethodRouter<AppState> =
         axum::routing::post(deobfuscate::handler)
@@ -130,27 +232,80 @@ pub fn build_router(config: Config, spinyarn: Arc<Spinyarn>) -> Router {
     let deobfuscate_plain_route: axum::routing::MethodRouter<AppState> =
         deobfuscate_plain_route.layer(info_trace.clone());
 
+    let load_route: axum::routing::MethodRouter<AppState> =
+        axum::routing::post(mappings::load_mapping);
     let load_local_route: axum::routing::MethodRouter<AppState> =
         axum::routing::post(mappings::load_mapping_local);
-    let list_route: axum::routing::MethodRouter<AppState> = axum::routing::get(mappings::list_mappings);
-    let stats_route: axum::routing::MethodRouter<AppState> = axum::routing::get(mappings::mapping_stats);
-    let unload_route: axum::routing::MethodRouter<AppState> = axum::routing::delete(mappings::unload_mapping);
+    let unload_route: axum::routing::MethodRouter<AppState> =
+        axum::routing::delete(mappings::unload_mapping);
 
-    let api_routes = Router::new()
+    let list_route: axum::routing::MethodRouter<AppState> =
+        axum::routing::get(mappings::list_mappings);
+    let stats_route: axum::routing::MethodRouter<AppState> =
+        axum::routing::get(mappings::mapping_stats);
+
+    // Public (open) routes keep the permissive CORS policy.
+    let public_routes = Router::new()
         .route("/api/v1/deobfuscate", deobfuscate_route)
         .route("/api/v1/deobfuscate/plain", deobfuscate_plain_route)
-        .route("/api/v1/mappings/load/local", load_local_route)
         .route("/api/v1/mappings", list_route)
         .route("/api/v1/mappings/:type/:version", stats_route)
-        .route("/api/v1/mappings/:version", unload_route)
         .route("/api/v1/openapi.json", axum::routing::get(openapi_json))
         .route(
             "/api/v1/health",
             axum::routing::get(health::handler).layer(debug_trace),
         )
-        .with_state(AppState {
-            gate: Arc::new(Semaphore::new(config.server.max_concurrency)),
-            spinyarn,
-        });
-    Router::new().merge(api_routes).layer(cors)
+        .layer(public_cors());
+
+    // Write (admin) routes use the whitelist CORS policy.
+    let admin_routes = Router::new()
+        .route("/api/v1/mappings/load", load_route)
+        .route("/api/v1/mappings/load/local", load_local_route)
+        .route("/api/v1/mappings/:version", unload_route)
+        .layer(admin_cors(&config.server.cors_origins));
+
+    Router::new()
+        .merge(public_routes)
+        .merge(admin_routes)
+        .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn headers_with(token: &str) -> axum::http::HeaderMap {
+        let mut h = axum::http::HeaderMap::new();
+        h.insert("x-admin-token", token.parse().unwrap());
+        h
+    }
+
+    #[test]
+    fn test_require_admin_unconfigured_is_forbidden() {
+        let h = headers_with("anything");
+        assert!(require_admin(&h, "").is_err());
+        let empty = axum::http::HeaderMap::new();
+        assert!(require_admin(&empty, "").is_err());
+    }
+
+    #[test]
+    fn test_require_admin_accepts_both_headers() {
+        assert!(require_admin(&headers_with("s3cret"), "s3cret").is_ok());
+        let mut h = axum::http::HeaderMap::new();
+        h.insert(
+            axum::http::header::AUTHORIZATION,
+            "Bearer s3cret".parse().unwrap(),
+        );
+        assert!(require_admin(&h, "s3cret").is_ok());
+        assert!(require_admin(&headers_with("wrong"), "s3cret").is_err());
+        let empty = axum::http::HeaderMap::new();
+        assert!(require_admin(&empty, "s3cret").is_err());
+    }
+
+    #[test]
+    fn test_constant_time_eq() {
+        assert!(constant_time_eq(b"abc", b"abc"));
+        assert!(!constant_time_eq(b"abc", b"abd"));
+        assert!(!constant_time_eq(b"abc", b"abcd"));
+    }
 }
