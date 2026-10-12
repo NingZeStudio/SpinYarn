@@ -1,0 +1,74 @@
+# .cnb/ci.yml — CI 主流水线：检查 / Clippy / 格式 / 单测 / release 构建 / 集成测试
+#
+# 与 .github/workflows/ci.yml 职责一致，步骤一一对应：
+#   Check → cargo check --workspace --all-targets
+#   Clippy → cargo clippy -- -D warnings
+#   Format → cargo fmt --check
+#   Test → SPINYARN_REQUIRE_MAPPINGS=1 cargo test --workspace --all-targets
+#   Build release → cargo build --release --workspace
+#   Integration Tests → SPINYARN_BIN=./target/release/spinyarn ./test.sh
+#
+# ── 沿用 LogShare .cnb 实战结论（改配置前先读） ──────────────────────────────
+# 1) 整条流水线的复用走 include 的分支级合并 + 同文件 YAML 锚点，不要用
+#    `push: !reference [...]` 引用整条流水线（CNB runner 下静默产出空流水线）。
+# 2) `script` 由 sh（dash）执行，不用 bash 特性，统一 `set -eu`；要 bash 的
+#    命令显式 `bash xxx.sh` 调用（test.sh 的 shebang 是 bash，照常工作）。
+# 3) 无需 services：单测走 Redis 不可达 fail-open 分支，test.sh 只需本机端口。
+# 4) cargo registry 走 copy-on-write 卷缓存（仅同节点有效，冷节点全量下载）。
+#
+# push 与 pull_request 跑同一套 CI：锚点定义在 main.push 首项上，再被
+# pull_request 引用，避免两处维护同一份 stage 列表。
+
+# CI 的完整 stage 列表。本文件内用 YAML 锚点复用，跨文件复用走 include 合并。
+.ci-stages: &ci-stages
+  - name: 安装依赖与下载映射表
+    script: |
+      set -eu
+      apt-get update && apt-get install -y jq curl
+      bash scripts/download_mappings.sh 1.21.9 1.21.11 1.18.2-pre1 1.21.3 1.21.4 1.14.4
+
+  - name: 检查
+    script: |
+      set -eu
+      cargo check --workspace --all-targets
+
+  - name: Clippy
+    script: |
+      set -eu
+      cargo clippy --workspace --all-targets -- -D warnings
+
+  - name: 格式
+    script: |
+      set -eu
+      cargo fmt --check
+
+  - name: 单测
+    script: |
+      set -eu
+      cargo test --workspace --all-targets
+
+  - name: 构建 release
+    script: |
+      set -eu
+      cargo build --release --workspace
+
+  - name: 集成测试
+    script: |
+      set -eu
+      chmod +x ./test.sh
+      SPINYARN_BIN=./target/release/spinyarn bash test.sh
+
+main:
+  push:
+    - &ci-pipeline
+      name: CI
+      docker:
+        image: rust:1.90
+        volumes:
+          - /usr/local/cargo/registry:copy-on-write
+      env:
+        # 缺映射直接失败而非静默跳过，防回归躲在 absent 文件后面
+        SPINYARN_REQUIRE_MAPPINGS: "1"
+      stages: *ci-stages
+  pull_request:
+    - *ci-pipeline

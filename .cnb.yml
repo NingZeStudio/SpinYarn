@@ -1,3 +1,28 @@
+# .cnb.yml — SpinYarn CNB 云原生构建流水线
+#
+# 迁移自 .github/workflows/{ci.yml,release.yml}，职责与原 GitHub Actions 一致：
+#   CI      ：push(main) / pull_request 触发，检查 + Clippy + 格式 + 单测
+#             + release 构建 + test.sh 集成测试。
+#   Release ：提交信息以 [Build] 开头时发布 CNB Release（tag 取 Cargo.toml，
+#             notes 取 CHANGELOG 最新版本条目；仍是 [Unreleased] 则拒绝发布）。
+#   Sync    ：push(main) 时把代码同步回 GitHub（NingZeStudio/SpinYarn）。
+#
+# ── 文件拆分 ────────────────────────────────────────────────────────────────
+#   .cnb/ci.yml       CI 主流水线
+#   .cnb/release.yml  Release 发布
+#
+# 各 include 文件在自己的 `main:` / `pull_request:` 下声明流水线，靠「分支 +
+# 事件」这一层的合并规则并入本配置；本文件只额外放 GitHub 同步这条。注意
+# imports 必须与 stages 处于同一个 pipeline 对象内，拆成两个列表项会被解析
+# 成两条独立流水线（imports 那条非法且永远不生效）。
+#
+# 触发说明：某分支的流水线只由该分支自己的 .cnb.yml 决定，
+# 在 main 下配置别的分支并不会让别的分支按此配置执行。
+
+include:
+  - .cnb/ci.yml
+  - .cnb/release.yml
+
 main:
   push:
     - imports:

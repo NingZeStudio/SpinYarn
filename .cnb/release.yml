@@ -1,0 +1,72 @@
+# .cnb/release.yml — Release 发布流水线
+#
+# 触发时机：main 分支 push 且提交信息以 [Build] 开头（与原 GitHub Actions
+# release job 的触发条件一致）。
+# tag 取自 Cargo.toml 的 version（v 前缀），Release notes 取 CHANGELOG.md
+# 最新版本条目；与 GitHub 流程不同的是：如果最新条目仍是 [Unreleased]，
+# 直接失败，强制先落版再发（避免把草稿纪要发出去）。
+#
+# ── 门控为什么写在每个 Stage 上 ──────────────────────────────────────────────
+# CNB 没有 Pipeline 级条件，只有 Stage/Job 级 `if`；且前一个 Stage 被跳过时
+# 后续 Stage 照常执行——判据必须落到真正做事的每个 Stage 上（沿用 LogShare
+# .cnb/release.yml 的实测结论）。
+
+# 门控判据：非 push 事件（手动触发）放行；push 事件要求标题以 [Build] 开头。
+# 注意不能写成 ${VAR#[Build]}：方括号会被当成 glob 字符类，必须用 case。
+.release-pipeline: &release-pipeline
+  name: Release
+  docker:
+    # 只需 grep/awk 解析版本与纪要，不需要 Rust 运行时
+    image: docker:27-cli
+  stages:
+    - name: 生成 Release 元数据
+      if: |
+        if [ "$CNB_EVENT" != "push" ]; then exit 0; fi
+        case "$CNB_COMMIT_MESSAGE_TITLE" in
+          "[Build]"*) exit 0 ;;
+          *) echo "提交信息不以 [Build] 开头，跳过发布"; exit 1 ;;
+        esac
+      script: |
+        set -eu
+        # tag 取 Cargo.toml 首个 version（如 version = "1.2.0" → v1.2.0）
+        VER=$(grep -m1 '^version' Cargo.toml | sed 's/.*= *"\(.*\)".*/\1/')
+        if [ -z "$VER" ]; then
+          echo "Cargo.toml 未找到 version"; exit 1
+        fi
+        echo "版本号: $VER"
+        # 最新条目仍是 [Unreleased] 说明没落版，拒绝发布
+        FIRST=$(grep -m1 '^## ' CHANGELOG.md || true)
+        case "$FIRST" in
+          *Unreleased*)
+            echo "CHANGELOG 最新条目仍是 [Unreleased]，请先落版再 [Build] 发布"
+            exit 1
+            ;;
+        esac
+        # Release notes 取首条版本到第二条版本之间的正文
+        awk 'BEGIN{s=0} /^## /{if(s) exit; s=1; next} s{print}' CHANGELOG.md > RELEASE_NOTES.md
+        if [ ! -s RELEASE_NOTES.md ]; then
+          echo "Release notes 为空"; exit 1
+        fi
+        head -n 5 RELEASE_NOTES.md
+        echo "##[set-output tag=v${VER}]"
+      exports:
+        tag: RELEASE_TAG
+      # exports 的生命周期是当前 Pipeline，后续 Stage 可直接用 $RELEASE_TAG
+
+    - name: 发布 Release
+      # 必须与上一个 Stage 用同一套判据：上一个被跳过时这个仍会执行
+      if: |
+        if [ "$CNB_EVENT" != "push" ]; then exit 0; fi
+        case "$CNB_COMMIT_MESSAGE_TITLE" in
+          "[Build]"*) exit 0 ;;
+          *) echo "提交信息不以 [Build] 开头，跳过发布"; exit 1 ;;
+        esac
+      type: git:release
+      options:
+        tag: $RELEASE_TAG
+        title: SpinYarn $RELEASE_TAG
+        descriptionFromFile: RELEASE_NOTES.md
+
+main:
+  push:
+    - *release-pipeline
