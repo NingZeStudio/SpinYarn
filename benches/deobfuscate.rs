@@ -46,7 +46,13 @@ fn bench_deobfuscate(c: &mut Criterion) {
     let reps = target / real_log.len() + 1;
     let mut big_log = real_log.clone().repeat(reps);
     // Truncate on a char boundary to avoid panicking on non-ASCII content.
-    big_log.truncate(big_log.floor_char_boundary(target));
+    // (Stable equivalent of `floor_char_boundary`, which needs Rust ≥1.91;
+    // this keeps the workspace MSRV at 1.88 for `--all-targets` CI images.)
+    let mut boundary = target.min(big_log.len());
+    while !big_log.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    big_log.truncate(boundary);
 
     c.bench_function("deobfuscate/pure_stack_5k", |b| {
         b.iter(|| black_box(engine.deobfuscate(black_box(&stack_log))))

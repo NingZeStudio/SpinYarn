@@ -63,6 +63,8 @@ main:
     - &ci-pipeline
       name: CI
       docker:
+        # 与 LogShare 构建镜像同版本；benches 已避开 ≥1.91 才稳定的 API，
+        # `--all-targets` 在此版本可编译（MSRV 1.88 守住）
         image: rust:1.90
         volumes:
           - /usr/local/cargo/registry:copy-on-write
