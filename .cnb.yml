@@ -5,7 +5,7 @@
 #             + release 构建 + test.sh 集成测试。
 #   Release ：提交信息以 [Build] 开头时发布 CNB Release（tag 取 Cargo.toml，
 #             notes 取 CHANGELOG 最新版本条目；仍是 [Unreleased] 则拒绝发布）。
-#   Sync    ：push(main) 时把代码同步回 GitHub（NingZeStudio/SpinYarn）。
+#   Sync    ：push(main) 时把代码同步回 GitHub（anylyralabs/SpinYarn）。
 #
 # ── 文件拆分 ────────────────────────────────────────────────────────────────
 #   .cnb/ci.yml       CI 主流水线
@@ -31,7 +31,7 @@ main:
         - name: sync to github
           image: tencentcom/git-sync
           settings:
-            target_url: https://github.com/NingZeStudio/SpinYarn
+            target_url: https://github.com/anylyralabs/SpinYarn
             auth_type: https
             username: qitry
             password: ${GITHUB_TOKEN}
